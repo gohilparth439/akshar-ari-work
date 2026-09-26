@@ -666,16 +666,7 @@ body {
 }
 
 .bill-type-badge {
-  display: inline-block;
-  background-color: var(--primary-red);
-  color: #ffffff;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  white-space: nowrap;
+  display: none !important;
 }
 
 /* Bill Meta Strip */
@@ -974,148 +965,322 @@ body {
   color: var(--light-text);
   margin-top: 8px;
   padding: 0 4px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.history-sort-info {
-  font-weight: 500;
+.history-stats-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.history-toggle-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-toggle-tool {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: var(--mid-text);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-toggle-tool:hover {
+  background: #f3f4f6;
+  color: var(--dark-text);
+  border-color: #9ca3af;
 }
 
 .history-cards-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-/* History Card */
-.history-card {
+/* ==========================================================================
+   PARTY-NAME-WISE GROUPED HISTORY STYLES
+   ========================================================================== */
+.party-group {
   background-color: #ffffff;
   border: 1.5px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 14px;
+  overflow: hidden;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.history-card:hover {
+.party-group:hover {
   border-color: var(--primary-red-border);
   box-shadow: var(--shadow-md);
 }
 
-.history-card-header {
+/* Party Group Accordion Header */
+.party-group-header {
+  width: 100%;
+  padding: 12px 14px;
+  background-color: #fafbfc;
+  border: none;
+  border-bottom: 1.5px solid #eaecef;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
-  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background-color 0.15s ease;
+  gap: 12px;
+  user-select: none;
+}
+
+.party-group-header:hover {
+  background-color: #f3f4f6;
+}
+
+.party-group-header:focus-visible {
+  outline: 2px solid var(--primary-red);
+  outline-offset: -2px;
+}
+
+.party-group.is-collapsed .party-group-header {
+  border-bottom-color: transparent;
+}
+
+.party-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.party-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.h-meta-primary {
+.party-name-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--light-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.party-name-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary-red);
+  letter-spacing: 0.3px;
+  word-break: break-word;
+}
+
+.party-meta-row {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.h-bill-badge {
-  background-color: var(--primary-red-light);
-  color: var(--primary-red);
-  font-weight: 800;
-  font-size: 12.5px;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--primary-red-border);
-}
-
-.h-challan-badge {
+.party-bills-badge {
   background-color: #f3f4f6;
-  color: var(--mid-text);
-  font-weight: 600;
-  font-size: 11.5px;
-  padding: 3px 8px;
+  color: var(--dark-text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid #d1d5db;
 }
 
-.h-date {
+.party-total-badge {
+  background-color: var(--primary-red-light);
+  color: var(--primary-red);
   font-size: 12px;
-  color: var(--light-text);
-  font-weight: 600;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--primary-red-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.history-card-body {
+.party-chevron-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: var(--mid-text);
+  flex-shrink: 0;
+  transition: transform 0.2s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.party-group:not(.is-collapsed) .party-chevron-box svg {
+  transform: rotate(180deg);
+}
+
+.party-group.is-collapsed .party-chevron-box svg {
+  transform: rotate(0deg);
+}
+
+.party-group-header:hover .party-chevron-box {
+  border-color: var(--primary-red-border);
+  color: var(--primary-red);
+}
+
+/* Bills List inside Party Group */
+.party-bills-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 10px;
+  padding: 12px;
+  background-color: #ffffff;
 }
 
-.h-info-row {
+.party-group.is-collapsed .party-bills-list {
+  display: none;
+}
+
+/* Individual Bill Card inside Party Group */
+.party-bill-card {
+  background-color: #fafbfc;
+  border: 1px solid #e5e7eb;
+  border-left: 3.5px solid var(--primary-red);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.party-bill-card:hover {
+  background-color: #ffffff;
+  border-color: #d1d5db;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+}
+
+.pb-meta-line {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #e5e7eb;
 }
 
-.h-label {
-  color: var(--mid-text);
-  font-weight: 600;
+.pb-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.h-val.party-val {
-  color: var(--dark-text);
-  font-weight: 700;
-  text-align: right;
-  max-width: 65%;
-  word-break: break-word;
-}
-
-.h-val.total-val {
+.pb-bill-badge {
+  background-color: var(--primary-red-light);
   color: var(--primary-red);
   font-weight: 800;
-  font-size: 15px;
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--primary-red-border);
 }
 
-.h-items-summary {
+.pb-challan-badge {
+  background-color: #f3f4f6;
+  color: var(--mid-text);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #d1d5db;
+}
+
+.pb-date {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--light-text);
+}
+
+.pb-data-line {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px dashed #f0f0f0;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
-.h-items-pill {
+.pb-total-group {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.pb-total-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mid-text);
+}
+
+.pb-total-val {
+  font-weight: 800;
+  font-size: 14.5px;
+  color: var(--primary-red);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.pb-items-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
+  color: var(--light-text);
+  max-width: 60%;
+}
+
+.pb-items-pill {
+  font-size: 10.5px;
   font-weight: 700;
   color: #4b5563;
   background-color: #f3f4f6;
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: var(--radius-full);
+  border: 1px solid #e5e7eb;
 }
 
-.h-first-desc {
-  font-size: 11.5px;
-  color: var(--light-text);
+.pb-first-desc {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.history-card-actions {
+.pb-actions-line {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  padding-top: 10px;
+  gap: 6px;
+  padding-top: 6px;
   border-top: 1px solid #f0f0f0;
 }
 
-.history-card-actions .btn {
-  font-size: 12px !important;
-  padding: 6px 8px !important;
-  min-height: 36px !important;
+.pb-actions-line .btn {
+  font-size: 11.5px !important;
+  padding: 5px 6px !important;
+  min-height: 34px !important;
+  gap: 4px !important;
 }
 
 /* History Empty State */
@@ -1347,11 +1512,6 @@ body {
     font-size: 28px;
   }
 
-  .bill-type-badge {
-    font-size: 11px;
-    padding: 5px 12px;
-  }
-
   .bill-table th {
     font-size: 11px;
     padding: 7px 6px;
@@ -1508,12 +1668,6 @@ body {
     color: #b71c1c !important;
   }
 
-  .bill-type-badge {
-    font-size: 10px !important;
-    padding: 4px 10px !important;
-    background-color: #b71c1c !important;
-    color: #ffffff !important;
-  }
 
   .bill-table-container {
     margin-bottom: 8mm !important;
@@ -1649,17 +1803,6 @@ body {
   margin: 0 !important;
 }
 
-.pdf-render-mode .bill-type-badge {
-  display: inline-block !important;
-  background-color: #b71c1c !important;
-  color: #ffffff !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  letter-spacing: 1px !important;
-  padding: 4px 12px !important;
-  border-radius: 4px !important;
-  text-transform: uppercase !important;
-}
 
 .pdf-render-mode .bill-meta-strip {
   display: flex !important;

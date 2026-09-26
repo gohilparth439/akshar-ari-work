@@ -773,8 +773,134 @@ function saveCurrentBillToHistory() {
   saveHistoryList(historyList);
 }
 
+// State tracking for collapsed party groups
+const collapsedPartyKeys = new Set();
+
 /**
- * Render history cards based on current search query
+ * Group a flat list of bills into party groups
+ * @param {Array<Object>} bills
+ * @returns {Array<Object>}
+ */
+function groupBillsByParty(bills) {
+  const groupsMap = new Map();
+
+  bills.forEach(bill => {
+    const rawParty = (bill.partyName || '').trim();
+    const displayParty = rawParty || 'General / Cash';
+    const partyKey = rawParty ? rawParty.toLowerCase() : '__general_cash__';
+
+    if (!groupsMap.has(partyKey)) {
+      groupsMap.set(partyKey, {
+        partyName: displayParty,
+        partyKey: partyKey,
+        bills: [],
+        totalAmount: 0,
+        billCount: 0,
+        latestTimestamp: 0
+      });
+    }
+
+    const group = groupsMap.get(partyKey);
+    // Keep the best formatted version of party name
+    if (group.partyName === 'General / Cash' && rawParty) {
+      group.partyName = displayParty;
+    }
+
+    group.bills.push(bill);
+    const amount = Number(bill.grandTotal) || 0;
+    group.totalAmount += amount;
+    group.billCount++;
+
+    // Track latest bill timestamp for recency sorting
+    const billTimestamp = bill.createdAt ? new Date(bill.createdAt).getTime() : 
+                          (bill.billDate ? new Date(bill.billDate).getTime() : 0);
+    if (billTimestamp > group.latestTimestamp) {
+      group.latestTimestamp = billTimestamp;
+    }
+  });
+
+  const partyGroups = Array.from(groupsMap.values());
+
+  // Sort bills newest first within each party group
+  partyGroups.forEach(group => {
+    group.bills.sort((a, b) => {
+      // 1. Compare billDate descending (YYYY-MM-DD)
+      const dateA = a.billDate || '';
+      const dateB = b.billDate || '';
+      if (dateA !== dateB) {
+        return dateB.localeCompare(dateA);
+      }
+      // 2. Compare updatedAt or createdAt descending
+      const timeA = a.updatedAt || a.createdAt || '';
+      const timeB = b.updatedAt || b.createdAt || '';
+      if (timeA !== timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      // 3. Fallback to id
+      return (b.id || '').localeCompare(a.id || '');
+    });
+  });
+
+  // Sort party groups by latest bill activity descending
+  partyGroups.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
+
+  return partyGroups;
+}
+
+/**
+ * Toggle collapse/expand state for a specific party group
+ * @param {string} partyKey
+ */
+function togglePartyGroup(partyKey) {
+  const safeId = 'party-group-' + encodeURIComponent(partyKey).replace(/%/g, '_');
+  const groupEl = document.getElementById(safeId);
+
+  if (collapsedPartyKeys.has(partyKey)) {
+    collapsedPartyKeys.delete(partyKey);
+    if (groupEl) {
+      groupEl.classList.remove('is-collapsed');
+      const btn = groupEl.querySelector('.party-group-header');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+  } else {
+    collapsedPartyKeys.add(partyKey);
+    if (groupEl) {
+      groupEl.classList.add('is-collapsed');
+      const btn = groupEl.querySelector('.party-group-header');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+}
+
+/**
+ * Expand all party groups
+ */
+function expandAllPartyGroups() {
+  collapsedPartyKeys.clear();
+  const allGroups = document.querySelectorAll('.party-group');
+  allGroups.forEach(el => {
+    el.classList.remove('is-collapsed');
+    const btn = el.querySelector('.party-group-header');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+  });
+}
+
+/**
+ * Collapse all party groups
+ */
+function collapseAllPartyGroups() {
+  const allGroups = document.querySelectorAll('.party-group');
+  allGroups.forEach(el => {
+    const key = el.getAttribute('data-party-key');
+    if (key) collapsedPartyKeys.add(key);
+    el.classList.add('is-collapsed');
+    const btn = el.querySelector('.party-group-header');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+/**
+ * Render Party-Name-Wise grouped history cards based on current search query
  * @param {string} filterQuery
  */
 function renderHistoryCards(filterQuery = null) {
@@ -788,33 +914,16 @@ function renderHistoryCards(filterQuery = null) {
     elements.btnClearSearch.style.display = query ? 'block' : 'none';
   }
 
-  // Filter bills
-  let filteredBills = allBills;
-  if (query) {
-    filteredBills = allBills.filter(bill => {
-      const matchBillNo = (bill.billNo || '').toLowerCase().includes(query);
-      const matchChallan = (bill.challanNo || '').toLowerCase().includes(query);
-      const matchParty = (bill.partyName || '').toLowerCase().includes(query);
-      return matchBillNo || matchChallan || matchParty;
-    });
-  }
-
-  // Update stats text
-  if (elements.historyCountText) {
-    if (query) {
-      elements.historyCountText.textContent = `Showing ${filteredBills.length} of ${allBills.length} saved bills`;
-    } else {
-      elements.historyCountText.textContent = `${allBills.length} saved bill${allBills.length === 1 ? '' : 's'}`;
-    }
-  }
-
-  // Handle empty states
+  // Handle empty state (no bills saved at all)
   if (allBills.length === 0) {
+    if (elements.historyCountText) {
+      elements.historyCountText.textContent = '0 saved bills';
+    }
     elements.historyCardsContainer.innerHTML = `
       <div class="history-empty-state">
         <div class="empty-icon">📋</div>
         <h3 class="empty-title">No Saved Bills Yet</h3>
-        <p class="empty-desc">Bills generated in "Enter Bill" will automatically be saved here for easy access, reprinting, or editing.</p>
+        <p class="empty-desc">Bills generated in "Enter Bill" will automatically be grouped by Party Name here for easy access, reprinting, or editing.</p>
         <button class="btn btn-primary" type="button" onclick="switchTab('editor')">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Create First Bill
@@ -824,69 +933,143 @@ function renderHistoryCards(filterQuery = null) {
     return;
   }
 
-  if (filteredBills.length === 0) {
+  // Group all bills by party name
+  const allPartyGroups = groupBillsByParty(allBills);
+
+  // If query is present, filter party groups or matching bills
+  let displayGroups = allPartyGroups;
+  if (query) {
+    displayGroups = [];
+    allPartyGroups.forEach(group => {
+      const matchParty = group.partyName.toLowerCase().includes(query);
+      if (matchParty) {
+        // Party name matches, show all bills of this party
+        displayGroups.push(group);
+        // Auto-expand this group so user sees results immediately
+        collapsedPartyKeys.delete(group.partyKey);
+      } else {
+        // Check if any bills inside match billNo or challanNo
+        const matchingBills = group.bills.filter(b => 
+          (b.billNo || '').toLowerCase().includes(query) ||
+          (b.challanNo || '').toLowerCase().includes(query)
+        );
+        if (matchingBills.length > 0) {
+          const matchingTotal = matchingBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
+          displayGroups.push({
+            ...group,
+            bills: matchingBills,
+            billCount: matchingBills.length,
+            totalAmount: matchingTotal
+          });
+          collapsedPartyKeys.delete(group.partyKey);
+        }
+      }
+    });
+  }
+
+  // Update stats text
+  const totalBillsCount = displayGroups.reduce((sum, g) => sum + g.billCount, 0);
+  const totalAmountSum = displayGroups.reduce((sum, g) => sum + g.totalAmount, 0);
+
+  if (elements.historyCountText) {
+    if (query) {
+      elements.historyCountText.textContent = `Showing ${displayGroups.length} Part${displayGroups.length === 1 ? 'y' : 'ies'} (${totalBillsCount} Bill${totalBillsCount === 1 ? '' : 's'})`;
+    } else {
+      elements.historyCountText.textContent = `${displayGroups.length} Part${displayGroups.length === 1 ? 'y' : 'ies'} • ${totalBillsCount} Bills • Total: ${formatCurrency(totalAmountSum)}`;
+    }
+  }
+
+  if (displayGroups.length === 0) {
     elements.historyCardsContainer.innerHTML = `
       <div class="history-empty-state">
         <div class="empty-icon">🔍</div>
-        <h3 class="empty-title">No Matching Bills</h3>
-        <p class="empty-desc">No saved bills found matching "<strong>${escapeHtml(query)}</strong>".</p>
+        <h3 class="empty-title">No Matching Parties</h3>
+        <p class="empty-desc">No party name or bills found matching "<strong>${escapeHtml(query)}</strong>".</p>
         <button class="btn btn-secondary" type="button" onclick="clearHistorySearch()">Clear Search</button>
       </div>
     `;
     return;
   }
 
-  // Render cards
-  const cardsHtml = filteredBills.map(bill => {
-    // Count filled items and find first description
-    const filledItems = (bill.items || []).filter(it => it.desc || parseFloat(it.qty) > 0 || parseFloat(it.rate) > 0);
-    const firstFilledDesc = filledItems.length > 0 && filledItems[0].desc ? filledItems[0].desc : 'No item descriptions';
-    const challanBadgeHtml = bill.challanNo
-      ? `<span class="h-challan-badge">Challan: ${escapeHtml(bill.challanNo)}</span>`
-      : '';
+  // Render Party Groups
+  const groupsHtml = displayGroups.map(group => {
+    const isCollapsed = collapsedPartyKeys.has(group.partyKey);
+    const safeId = 'party-group-' + encodeURIComponent(group.partyKey).replace(/%/g, '_');
+
+    // Render bills inside this party (newest first)
+    const billsHtml = group.bills.map(bill => {
+      const filledItems = (bill.items || []).filter(it => it.desc || parseFloat(it.qty) > 0 || parseFloat(it.rate) > 0);
+      const firstFilledDesc = filledItems.length > 0 && filledItems[0].desc ? filledItems[0].desc : 'No item descriptions';
+      const challanBadgeHtml = bill.challanNo 
+        ? `<span class="pb-challan-badge">Party Challan No: ${escapeHtml(bill.challanNo)}</span>`
+        : '';
+
+      return `
+        <div class="party-bill-card" id="h-card-${escapeHtml(bill.id)}">
+          <div class="pb-meta-line">
+            <div class="pb-badge-group">
+              <span class="pb-bill-badge">Bill No: ${escapeHtml(bill.billNo)}</span>
+              ${challanBadgeHtml}
+            </div>
+            <span class="pb-date">Date: ${formatDateDisplay(bill.billDate)}</span>
+          </div>
+
+          <div class="pb-data-line">
+            <div class="pb-total-group">
+              <span class="pb-total-lbl">Grand Total:</span>
+              <span class="pb-total-val">${formatCurrency(bill.grandTotal || 0)}</span>
+            </div>
+            <div class="pb-items-summary" title="${escapeHtml(firstFilledDesc)}">
+              <span class="pb-items-pill">${filledItems.length} item${filledItems.length === 1 ? '' : 's'}</span>
+              <span class="pb-first-desc">${escapeHtml(firstFilledDesc)}</span>
+            </div>
+          </div>
+
+          <div class="pb-actions-line">
+            <button class="btn btn-secondary" type="button" onclick="viewHistoryBill('${escapeHtml(bill.id)}')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              View
+            </button>
+            <button class="btn btn-secondary" type="button" onclick="editHistoryBill('${escapeHtml(bill.id)}')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
+            <button class="btn btn-danger-outline" type="button" onclick="deleteHistoryBill('${escapeHtml(bill.id)}')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const escapedPartyKey = escapeHtml(group.partyKey).replace(/'/g, "\\'");
 
     return `
-      <div class="history-card" id="h-card-${escapeHtml(bill.id)}">
-        <div class="history-card-header">
-          <div class="h-meta-primary">
-            <span class="h-bill-badge">Bill #${escapeHtml(bill.billNo)}</span>
-            ${challanBadgeHtml}
+      <div class="party-group ${isCollapsed ? 'is-collapsed' : ''}" id="${safeId}" data-party-key="${escapeHtml(group.partyKey)}">
+        <div class="party-group-header" role="button" tabindex="0" aria-expanded="${!isCollapsed}" onclick="togglePartyGroup('${escapedPartyKey}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePartyGroup('${escapedPartyKey}');}">
+          <div class="party-header-info">
+            <div class="party-name-row">
+              <span class="party-name-label">PARTY:</span>
+              <span class="party-name-title">${escapeHtml(group.partyName)}</span>
+            </div>
+            <div class="party-meta-row">
+              <span class="party-bills-badge">${group.billCount} Bill${group.billCount === 1 ? '' : 's'}</span>
+              <span class="party-total-badge">Total: ${formatCurrency(group.totalAmount)}</span>
+            </div>
           </div>
-          <span class="h-date">${formatDateDisplay(bill.billDate)}</span>
-        </div>
-        <div class="history-card-body">
-          <div class="h-info-row">
-            <span class="h-label">Party Name:</span>
-            <span class="h-val party-val">${escapeHtml(bill.partyName || '—')}</span>
-          </div>
-          <div class="h-info-row">
-            <span class="h-label">Grand Total:</span>
-            <span class="h-val total-val">${formatCurrency(bill.grandTotal || 0)}</span>
-          </div>
-          <div class="h-items-summary">
-            <span class="h-items-pill">${filledItems.length} item${filledItems.length === 1 ? '' : 's'}</span>
-            <span class="h-first-desc" title="${escapeHtml(firstFilledDesc)}">${escapeHtml(firstFilledDesc)}</span>
+          <div class="party-chevron-box" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
         </div>
-        <div class="history-card-actions">
-          <button class="btn btn-secondary" type="button" onclick="viewHistoryBill('${escapeHtml(bill.id)}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            View Bill
-          </button>
-          <button class="btn btn-secondary" type="button" onclick="editHistoryBill('${escapeHtml(bill.id)}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Edit / Reuse
-          </button>
-          <button class="btn btn-danger-outline" type="button" onclick="deleteHistoryBill('${escapeHtml(bill.id)}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Delete
-          </button>
+        <div class="party-bills-list">
+          ${billsHtml}
         </div>
       </div>
     `;
   }).join('');
 
-  elements.historyCardsContainer.innerHTML = cardsHtml;
+  elements.historyCardsContainer.innerHTML = groupsHtml;
 }
 
 /**
@@ -1075,6 +1258,9 @@ window.editHistoryBill = editHistoryBill;
 window.deleteHistoryBill = deleteHistoryBill;
 window.handleClearAllHistory = handleClearAllHistory;
 window.clearHistorySearch = clearHistorySearch;
+window.togglePartyGroup = togglePartyGroup;
+window.expandAllPartyGroups = expandAllPartyGroups;
+window.collapseAllPartyGroups = collapseAllPartyGroups;
 
 /**
  * Initialize Application on DOM Ready

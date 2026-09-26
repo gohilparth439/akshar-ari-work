@@ -3,661 +3,480 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>AKSHAR ARI WORK - Bill Generator</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Bill History Archive - AKSHAR ARI WORK</title>
+  <link rel="stylesheet" href="../style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .history-page-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      background: #ffffff;
+      border-bottom: 2px solid var(--primary-red);
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background-color: var(--primary-red-light);
+      color: var(--primary-red);
+      border: 1px solid var(--primary-red-border);
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .back-btn:hover {
+      background-color: var(--primary-red);
+      color: #ffffff;
+    }
+    .history-container {
+      max-width: 900px;
+      margin: 16px auto;
+      padding: 0 16px 40px;
+    }
+  </style>
 </head>
 <body>
 
-  <!-- Application Header (Compact Mobile-First) -->
-  <header class="app-header no-print navigation">
-    <div class="header-container">
-      <div class="brand-info">
-        <div class="brand-icon">✨</div>
-        <h1 class="brand-title">AKSHAR ARI WORK</h1>
-      </div>
+  <!-- Top Nav Bar with Back Link -->
+  <header class="history-page-nav no-print">
+    <a href="../index.html" class="back-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      ← Back to Bill Generator
+    </a>
+    <div class="brand-info">
+      <h1 class="brand-title" style="font-size: 18px;">AKSHAR ARI WORK</h1>
     </div>
   </header>
 
-  <!-- Section Switcher Tabs (Separates Form & Preview) -->
-  <nav class="tab-navigation no-print navigation" aria-label="Bill Navigation">
-    <div class="tab-nav-container">
-      <button class="tab-btn active" id="tab-editor" type="button" onclick="switchTab('editor')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        1. ENTER BILL
-      </button>
-      <button class="tab-btn" id="tab-preview" type="button" onclick="switchTab('preview')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        2. BILL PREVIEW
-      </button>
-      <button class="tab-btn" id="tab-history" type="button" onclick="switchTab('history')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        3. BILL HISTORY <span class="tab-badge" id="history-badge">0</span>
+  <main class="history-container">
+    <div class="history-header-bar">
+      <div class="history-title-group">
+        <h2 class="history-main-heading">BILL HISTORY ARCHIVE</h2>
+      </div>
+      <button class="btn btn-danger-outline" id="btn-clear-history" type="button" onclick="handleClearAllHistory()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        Clear All History
       </button>
     </div>
-  </nav>
 
-  <!-- Main Application Container -->
-  <main class="app-container">
-
-    <!-- ==========================================
-         SECTION 1: BILL ENTRY FORM
-         ========================================== -->
-    <section class="section-panel input-section controls navigation mobile-entry buttons" id="panel-editor">
-      
-      <!-- Card 1: Bill Information (Bill No, Party Challan No, Date) -->
-      <div class="app-card">
-        <h2 class="card-heading">
-          <span class="step-badge">1</span> BILL INFORMATION
-        </h2>
-        <div class="form-grid-3">
-          <div class="form-group">
-            <label for="input-bill-no">Bill No.</label>
-            <input type="text" id="input-bill-no" class="form-input font-bold text-red" placeholder="Enter Bill No." autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label for="input-challan-no">Party Challan No. <span class="text-muted">(Optional)</span></label>
-            <input type="text" id="input-challan-no" class="form-input" placeholder="e.g. CH-101" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label for="input-bill-date">Date</label>
-            <input type="date" id="input-bill-date" class="form-input">
-          </div>
+    <!-- Search & Filter Card -->
+    <div class="app-card history-search-card">
+      <div class="search-input-wrapper">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="history-search-input" class="form-input search-input" placeholder="Search Party Name..." autocomplete="off">
+        <button class="search-clear-btn" id="btn-clear-search" type="button" onclick="clearHistorySearch()" style="display: none;">✕</button>
+      </div>
+      <div class="history-stats-bar">
+        <span id="history-count-text">0 saved bills</span>
+        <div class="history-toggle-tools">
+          <button type="button" class="btn-toggle-tool" onclick="expandAllPartyGroups()">Expand All</button>
+          <span class="history-tool-sep">|</span>
+          <button type="button" class="btn-toggle-tool" onclick="collapseAllPartyGroups()">Collapse All</button>
         </div>
       </div>
+    </div>
 
-      <!-- Card 2: Party Details -->
-      <div class="app-card">
-        <h2 class="card-heading">
-          <span class="step-badge">2</span> PARTY DETAILS
-        </h2>
-        <div class="form-group">
-          <label for="input-party-name">Party Name</label>
-          <input type="text" id="input-party-name" class="form-input" placeholder="Enter Party Name" autocomplete="off">
-        </div>
-      </div>
-
-      <!-- Card 3: 10 Item Entry Cards / Rows -->
-      <div class="app-card items-card">
-        <div class="card-heading-flex">
-          <h2 class="card-heading">
-            <span class="step-badge">3</span> ITEM ENTRY (10 ITEMS)
-          </h2>
-          <span class="tip-pill">Amount = Qty × Rate</span>
-        </div>
-
-        <!-- Desktop Table Header (Visible on Desktop > 600px, Hidden on Mobile) -->
-        <div class="desktop-table-header" aria-hidden="true">
-          <div class="dth-cell dth-sr">#</div>
-          <div class="dth-cell dth-desc">Item / Work Description</div>
-          <div class="dth-cell dth-qty">Quantity</div>
-          <div class="dth-cell dth-rate">Rate (₹)</div>
-          <div class="dth-cell dth-amount">Amount (₹)</div>
-        </div>
-
-        <!-- 10 Static Item Cards (Directly in HTML so inputs are NEVER missing) -->
-        <div class="items-list-container" id="items-list-container">
-          
-          <!-- ITEM 1 -->
-          <div class="item-card" data-index="1">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #1</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-1" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-1" class="form-input item-desc" data-index="1" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-1" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-1" class="form-input item-qty" data-index="1" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-1" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-1" class="form-input item-rate" data-index="1" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-1">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 2 -->
-          <div class="item-card" data-index="2">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #2</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-2" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-2" class="form-input item-desc" data-index="2" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-2" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-2" class="form-input item-qty" data-index="2" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-2" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-2" class="form-input item-rate" data-index="2" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-2">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 3 -->
-          <div class="item-card" data-index="3">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #3</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-3" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-3" class="form-input item-desc" data-index="3" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-3" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-3" class="form-input item-qty" data-index="3" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-3" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-3" class="form-input item-rate" data-index="3" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-3">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 4 -->
-          <div class="item-card" data-index="4">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #4</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-4" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-4" class="form-input item-desc" data-index="4" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-4" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-4" class="form-input item-qty" data-index="4" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-4" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-4" class="form-input item-rate" data-index="4" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-4">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 5 -->
-          <div class="item-card" data-index="5">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #5</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-5" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-5" class="form-input item-desc" data-index="5" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-5" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-5" class="form-input item-qty" data-index="5" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-5" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-5" class="form-input item-rate" data-index="5" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-5">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 6 -->
-          <div class="item-card" data-index="6">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #6</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-6" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-6" class="form-input item-desc" data-index="6" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-6" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-6" class="form-input item-qty" data-index="6" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-6" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-6" class="form-input item-rate" data-index="6" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-6">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 7 -->
-          <div class="item-card" data-index="7">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #7</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-7" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-7" class="form-input item-desc" data-index="7" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-7" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-7" class="form-input item-qty" data-index="7" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-7" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-7" class="form-input item-rate" data-index="7" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-7">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 8 -->
-          <div class="item-card" data-index="8">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #8</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-8" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-8" class="form-input item-desc" data-index="8" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-8" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-8" class="form-input item-qty" data-index="8" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-8" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-8" class="form-input item-rate" data-index="8" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-8">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 9 -->
-          <div class="item-card" data-index="9">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #9</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-9" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-9" class="form-input item-desc" data-index="9" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-9" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-9" class="form-input item-qty" data-index="9" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-9" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-9" class="form-input item-rate" data-index="9" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-9">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 10 -->
-          <div class="item-card" data-index="10">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #10</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-10" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-10" class="form-input item-desc" data-index="10" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-10" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-10" class="form-input item-qty" data-index="10" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-10" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-10" class="form-input item-rate" data-index="10" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-10">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Card 4: Calculation Summary -->
-      <div class="app-card summary-card">
-        <h2 class="card-heading">
-          <span class="step-badge">4</span> CALCULATION SUMMARY
-        </h2>
-        <div class="summary-list">
-          <div class="summary-item">
-            <span class="summary-title">Subtotal</span>
-            <span class="summary-value" id="calc-subtotal">₹ 0.00</span>
-          </div>
-          <div class="summary-item grand-total-item">
-            <span class="summary-title">GRAND TOTAL</span>
-            <span class="summary-value" id="calc-grandtotal">₹ 0.00</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 5: Actions / Button Grid -->
-      <div class="app-card actions-card controls buttons no-print">
-        <!-- Secondary Utility Row (New / Clear) -->
-        <div class="utility-btn-row">
-          <button id="btn-new-bill" class="btn btn-outline" type="button" onclick="handleNewBill()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            + New Bill
-          </button>
-          <button id="btn-clear" class="btn btn-outline-danger" type="button" onclick="handleClear()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Clear
-          </button>
-        </div>
-
-        <!-- Primary Action Buttons (Full Width, Min-Height: 46px, Large Touch Targets) -->
-        <div class="primary-btn-stack">
-          <button id="btn-generate" class="btn btn-primary btn-action-mobile" type="button" onclick="generateBill()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Generate Bill
-          </button>
-
-          <button id="btn-print" class="btn btn-secondary btn-action-mobile" type="button" onclick="printBill()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print Bill
-          </button>
-
-          <button id="btn-pdf" class="btn btn-accent btn-action-mobile" type="button" onclick="saveAsPDF()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Save as PDF
-          </button>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ==========================================
-         SECTION 2: A4 BILL PREVIEW
-         (Completely separated from Form)
-         ========================================== -->
-    <section class="section-panel" id="panel-preview" style="display: none;">
-      
-      <!-- Preview Navigation Toolbar (Screen Only) -->
-      <div class="preview-header-bar no-print controls buttons">
-        <button id="btn-back-to-edit" class="btn btn-outline btn-sm" type="button" onclick="switchTab('editor')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          ← Back to Edit Bill
-        </button>
-        <div class="preview-actions-right">
-          <button id="btn-preview-print" class="btn btn-secondary btn-sm" type="button" onclick="printBill()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print
-          </button>
-          <button id="btn-preview-pdf" class="btn btn-accent btn-sm" type="button" onclick="saveAsPDF()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Save PDF
-          </button>
-        </div>
-      </div>
-
-      <!-- Live A4 Bill Document (Print Target & PDF Source) -->
-      <div class="preview-container">
-        <div class="bill-preview preview-bill" id="bill-preview">
-          
-          <!-- Devotional Motto (॥ Jay Swaminarayan ॥) -->
-          <div class="bill-motto-wrapper">
-            <span class="motto-danda">॥</span>
-            <span class="motto-text">Jay Swaminarayan</span>
-            <span class="motto-danda">॥</span>
-          </div>
-
-          <!-- Bill Header -->
-          <div class="bill-header">
-            <div class="header-accent-bar"></div>
-            <div class="header-main-content">
-              <h1 class="bill-brand-name">AKSHAR ARI WORK</h1>
-              <span class="bill-type-badge">TAX INVOICE / CASH BILL</span>
-            </div>
-
-            <!-- Bill Meta Details (Manual Bill No, Party Challan No & Date) -->
-            <div class="bill-meta-strip">
-              <div class="meta-item">
-                <span class="meta-label">Bill No:</span>
-                <span class="meta-value font-mono text-red" id="view-bill-no">—</span>
-              </div>
-              <div class="meta-item is-hidden" id="view-challan-item" style="display: none !important;">
-                <span class="meta-label">Party Challan No:</span>
-                <span class="meta-value font-mono" id="view-challan-no"></span>
-              </div>
-              <div class="meta-item text-right">
-                <span class="meta-label">Date:</span>
-                <span class="meta-value" id="view-bill-date">--/--/----</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Party Details -->
-          <div class="bill-customer-section">
-            <div class="customer-info-box">
-              <div class="customer-info-header">PARTY DETAILS</div>
-              <div class="customer-info-body">
-                <div class="customer-row">
-                  <span class="customer-label">Party Name:</span>
-                  <span class="customer-value" id="view-party-name">—</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 10-Row Item Table (Pre-rendered directly in HTML) -->
-          <div class="bill-table-container">
-            <table class="bill-table">
-              <thead>
-                <tr>
-                  <th class="col-sr">Sr. No.</th>
-                  <th class="col-desc">Item / Work Description</th>
-                  <th class="col-qty">Quantity</th>
-                  <th class="col-rate">Rate (₹)</th>
-                  <th class="col-amount">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody id="view-items-tbody">
-                <tr>
-                  <td class="col-sr">1</td>
-                  <td class="col-desc" id="view-desc-1"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-1">—</td>
-                  <td class="col-rate" id="view-rate-1">—</td>
-                  <td class="col-amount" id="view-amount-1">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">2</td>
-                  <td class="col-desc" id="view-desc-2"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-2">—</td>
-                  <td class="col-rate" id="view-rate-2">—</td>
-                  <td class="col-amount" id="view-amount-2">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">3</td>
-                  <td class="col-desc" id="view-desc-3"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-3">—</td>
-                  <td class="col-rate" id="view-rate-3">—</td>
-                  <td class="col-amount" id="view-amount-3">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">4</td>
-                  <td class="col-desc" id="view-desc-4"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-4">—</td>
-                  <td class="col-rate" id="view-rate-4">—</td>
-                  <td class="col-amount" id="view-amount-4">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">5</td>
-                  <td class="col-desc" id="view-desc-5"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-5">—</td>
-                  <td class="col-rate" id="view-rate-5">—</td>
-                  <td class="col-amount" id="view-amount-5">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">6</td>
-                  <td class="col-desc" id="view-desc-6"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-6">—</td>
-                  <td class="col-rate" id="view-rate-6">—</td>
-                  <td class="col-amount" id="view-amount-6">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">7</td>
-                  <td class="col-desc" id="view-desc-7"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-7">—</td>
-                  <td class="col-rate" id="view-rate-7">—</td>
-                  <td class="col-amount" id="view-amount-7">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">8</td>
-                  <td class="col-desc" id="view-desc-8"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-8">—</td>
-                  <td class="col-rate" id="view-rate-8">—</td>
-                  <td class="col-amount" id="view-amount-8">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">9</td>
-                  <td class="col-desc" id="view-desc-9"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-9">—</td>
-                  <td class="col-rate" id="view-rate-9">—</td>
-                  <td class="col-amount" id="view-amount-9">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">10</td>
-                  <td class="col-desc" id="view-desc-10"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-10">—</td>
-                  <td class="col-rate" id="view-rate-10">—</td>
-                  <td class="col-amount" id="view-amount-10">—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Totals & Thank You Footer -->
-          <div class="bill-footer-section">
-            <div class="footer-left">
-              <div class="bill-thankyou-block">
-                <p class="bill-thankyou-text">Thank You!</p>
-                <p class="bill-thankyou-sub">We appreciate your valued business</p>
-              </div>
-            </div>
-            <div class="footer-right">
-              <div class="summary-table">
-                <div class="summary-row">
-                  <span class="lbl">Subtotal:</span>
-                  <span class="val font-mono" id="view-subtotal">₹ 0.00</span>
-                </div>
-                <div class="summary-row grand-total-row">
-                  <span class="lbl">GRAND TOTAL:</span>
-                  <span class="val font-mono" id="view-grandtotal">₹ 0.00</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ==========================================
-         SECTION 3: BILL HISTORY
-         ========================================== -->
-    <section class="section-panel no-print" id="panel-history" style="display: none;">
-      
-      <div class="history-header-bar">
-        <div class="history-title-group">
-          <h2 class="history-main-heading">SAVED BILL HISTORY</h2>
-        </div>
-        <button class="btn btn-danger-outline" id="btn-clear-history" type="button" onclick="handleClearAllHistory()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-          Clear All History
-        </button>
-      </div>
-
-      <!-- Search & Filter Card -->
-      <div class="app-card history-search-card">
-        <div class="search-input-wrapper">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="history-search-input" class="form-input search-input" placeholder="Search by Bill No., Challan No., or Party Name..." autocomplete="off">
-          <button class="search-clear-btn" id="btn-clear-search" type="button" onclick="clearHistorySearch()" style="display: none;">✕</button>
-        </div>
-        <div class="history-stats-bar">
-          <span id="history-count-text">0 saved bills</span>
-          <span class="history-sort-info">Sorted newest first</span>
-        </div>
-      </div>
-
-      <!-- History Cards Container -->
-      <div class="history-cards-container" id="history-cards-container">
-        <!-- Injected via JavaScript -->
-      </div>
-
-    </section>
-
+    <!-- History Cards Container -->
+    <div class="history-cards-container" id="history-cards-container">
+      <!-- Injected via JavaScript -->
+    </div>
   </main>
 
   <!-- Toast Notification -->
   <div id="toast" class="toast no-print" role="alert" aria-live="polite"></div>
 
-  <!-- Client-Side PDF Generation Libraries (CDN for Direct PDF Download on Android Chrome & GitHub Pages) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    const STORAGE_KEY_HISTORY = 'akshar_bills_history';
+    const STORAGE_KEY_CURRENT_BILL = 'akshar_current_bill_draft';
 
-  <!-- Application JavaScript -->
-  <script src="script.js"></script>
+    const searchInput = document.getElementById('history-search-input');
+    const clearSearchBtn = document.getElementById('btn-clear-search');
+    const countText = document.getElementById('history-count-text');
+    const cardsContainer = document.getElementById('history-cards-container');
+    const toast = document.getElementById('toast');
+
+    let collapsedPartyKeys = new Set();
+
+    let toastTimeout;
+    function showToast(message, type = 'success') {
+      if (!toast) return;
+      clearTimeout(toastTimeout);
+      toast.textContent = message;
+      toast.className = `toast show ${type === 'danger' ? 'toast-danger' : 'toast-success'}`;
+      toastTimeout = setTimeout(() => {
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    function formatCurrency(value) {
+      const num = isNaN(value) || value < 0 ? 0 : Number(value);
+      return '₹ ' + num.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function formatDateDisplay(dateString) {
+      if (!dateString) return '--/--/----';
+      const parts = dateString.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      return dateString;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function getHistoryList() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_HISTORY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveHistoryList(list) {
+      try {
+        localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(list));
+      } catch (e) {
+        console.error('Error saving history', e);
+      }
+    }
+
+    /**
+     * Group bills by normalized Party Name
+     */
+    function groupBillsByParty(bills) {
+      const groupsMap = new Map();
+
+      bills.forEach(bill => {
+        const rawParty = bill.partyName ? bill.partyName.trim() : '';
+        const normKey = rawParty.toLowerCase() || '__general_cash__';
+        const displayParty = rawParty || 'General / Cash';
+
+        if (!groupsMap.has(normKey)) {
+          groupsMap.set(normKey, {
+            partyKey: normKey,
+            partyName: displayParty,
+            bills: [],
+            totalAmount: 0,
+            billCount: 0,
+            latestTimestamp: ''
+          });
+        }
+
+        const group = groupsMap.get(normKey);
+        group.bills.push(bill);
+        group.totalAmount += (parseFloat(bill.grandTotal) || 0);
+        group.billCount += 1;
+
+        const bDate = bill.billDate || '';
+        const bTime = bill.updatedAt || bill.createdAt || '';
+        const combinedKey = `${bDate}_${bTime}`;
+        if (!group.latestTimestamp || combinedKey > group.latestTimestamp) {
+          group.latestTimestamp = combinedKey;
+        }
+      });
+
+      const sortedGroups = Array.from(groupsMap.values());
+
+      sortedGroups.forEach(group => {
+        group.bills.sort((a, b) => {
+          const dateA = a.billDate || '';
+          const dateB = b.billDate || '';
+          if (dateA !== dateB) {
+            return dateB.localeCompare(dateA); // Newest date first
+          }
+          const timeA = a.updatedAt || a.createdAt || '';
+          const timeB = b.updatedAt || b.createdAt || '';
+          return timeB.localeCompare(timeA);
+        });
+      });
+
+      sortedGroups.sort((a, b) => {
+        return (b.latestTimestamp || '').localeCompare(a.latestTimestamp || '');
+      });
+
+      return sortedGroups;
+    }
+
+    function togglePartyGroup(partyKey) {
+      const safeId = 'party-group-' + encodeURIComponent(partyKey).replace(/%/g, '_');
+      const groupEl = document.getElementById(safeId);
+      if (!groupEl) return;
+
+      const isNowCollapsed = !groupEl.classList.contains('is-collapsed');
+      if (isNowCollapsed) {
+        groupEl.classList.add('is-collapsed');
+        collapsedPartyKeys.add(partyKey);
+      } else {
+        groupEl.classList.remove('is-collapsed');
+        collapsedPartyKeys.delete(partyKey);
+      }
+
+      const headerBtn = groupEl.querySelector('.party-group-header');
+      if (headerBtn) {
+        headerBtn.setAttribute('aria-expanded', !isNowCollapsed ? 'true' : 'false');
+      }
+    }
+
+    function expandAllPartyGroups() {
+      collapsedPartyKeys.clear();
+      const allGroups = document.querySelectorAll('.party-group');
+      allGroups.forEach(el => {
+        el.classList.remove('is-collapsed');
+        const btn = el.querySelector('.party-group-header');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      });
+    }
+
+    function collapseAllPartyGroups() {
+      const allGroups = document.querySelectorAll('.party-group');
+      allGroups.forEach(el => {
+        const key = el.getAttribute('data-party-key');
+        if (key) collapsedPartyKeys.add(key);
+        el.classList.add('is-collapsed');
+        const btn = el.querySelector('.party-group-header');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function renderHistoryCards(filterQuery = null) {
+      if (!cardsContainer) return;
+
+      const allBills = getHistoryList();
+      const query = (filterQuery !== null ? filterQuery : (searchInput ? searchInput.value : '')).trim().toLowerCase();
+
+      if (clearSearchBtn) {
+        clearSearchBtn.style.display = query ? 'block' : 'none';
+      }
+
+      if (allBills.length === 0) {
+        if (countText) countText.textContent = '0 saved bills';
+        cardsContainer.innerHTML = `
+          <div class="history-empty-state">
+            <div class="empty-icon">📋</div>
+            <h3 class="empty-title">No Saved Bills Yet</h3>
+            <p class="empty-desc">Bills generated in the Bill Generator will automatically be saved and organized by Party Name here for easy access, reprinting, or editing.</p>
+            <a class="btn btn-primary" href="../index.html" style="text-decoration: none;">Go to Bill Generator</a>
+          </div>
+        `;
+        return;
+      }
+
+      const allPartyGroups = groupBillsByParty(allBills);
+
+      let displayGroups = allPartyGroups;
+      if (query) {
+        displayGroups = [];
+        allPartyGroups.forEach(group => {
+          const matchParty = group.partyName.toLowerCase().includes(query);
+          if (matchParty) {
+            displayGroups.push(group);
+            collapsedPartyKeys.delete(group.partyKey);
+          } else {
+            const matchingBills = group.bills.filter(bill => {
+              const matchBillNo = (bill.billNo || '').toLowerCase().includes(query);
+              const matchChallan = (bill.challanNo || '').toLowerCase().includes(query);
+              return matchBillNo || matchChallan;
+            });
+            if (matchingBills.length > 0) {
+              displayGroups.push({
+                ...group,
+                bills: matchingBills
+              });
+              collapsedPartyKeys.delete(group.partyKey);
+            }
+          }
+        });
+      }
+
+      if (countText) {
+        const totalMatchingBills = displayGroups.reduce((acc, g) => acc + g.bills.length, 0);
+        const partyWord = displayGroups.length === 1 ? 'party' : 'parties';
+        if (query) {
+          countText.textContent = `Showing ${displayGroups.length} ${partyWord} (${totalMatchingBills} of ${allBills.length} bills)`;
+        } else {
+          countText.textContent = `${displayGroups.length} ${partyWord} • ${allBills.length} total bills`;
+        }
+      }
+
+      if (displayGroups.length === 0) {
+        cardsContainer.innerHTML = `
+          <div class="history-empty-state">
+            <div class="empty-icon">🔍</div>
+            <h3 class="empty-title">No Matching Parties</h3>
+            <p class="empty-desc">No party name or bills found matching "<strong>${escapeHtml(query)}</strong>".</p>
+            <button class="btn btn-secondary" type="button" onclick="clearHistorySearch()">Clear Search</button>
+          </div>
+        `;
+        return;
+      }
+
+      const groupsHtml = displayGroups.map(group => {
+        const isCollapsed = collapsedPartyKeys.has(group.partyKey);
+        const safeId = 'party-group-' + encodeURIComponent(group.partyKey).replace(/%/g, '_');
+
+        const billsHtml = group.bills.map(bill => {
+          const filledItems = (bill.items || []).filter(it => it.desc || parseFloat(it.qty) > 0 || parseFloat(it.rate) > 0);
+          const firstFilledDesc = filledItems.length > 0 && filledItems[0].desc ? filledItems[0].desc : 'No item descriptions';
+          const challanBadgeHtml = bill.challanNo 
+            ? `<span class="pb-challan-badge">Party Challan No: ${escapeHtml(bill.challanNo)}</span>`
+            : '';
+
+          return `
+            <div class="party-bill-card" id="h-card-${escapeHtml(bill.id)}">
+              <div class="pb-meta-line">
+                <div class="pb-badge-group">
+                  <span class="pb-bill-badge">Bill No: ${escapeHtml(bill.billNo)}</span>
+                  ${challanBadgeHtml}
+                </div>
+                <span class="pb-date">Date: ${formatDateDisplay(bill.billDate)}</span>
+              </div>
+
+              <div class="pb-data-line">
+                <div class="pb-total-group">
+                  <span class="pb-total-lbl">Grand Total:</span>
+                  <span class="pb-total-val">${formatCurrency(bill.grandTotal || 0)}</span>
+                </div>
+                <div class="pb-items-summary" title="${escapeHtml(firstFilledDesc)}">
+                  <span class="pb-items-pill">${filledItems.length} item${filledItems.length === 1 ? '' : 's'}</span>
+                  <span class="pb-first-desc">${escapeHtml(firstFilledDesc)}</span>
+                </div>
+              </div>
+
+              <div class="pb-actions-line">
+                <button class="btn btn-secondary" type="button" onclick="openBillInGenerator('${escapeHtml(bill.id)}')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  View
+                </button>
+                <button class="btn btn-secondary" type="button" onclick="editBillInGenerator('${escapeHtml(bill.id)}')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Edit
+                </button>
+                <button class="btn btn-danger-outline" type="button" onclick="deleteHistoryBill('${escapeHtml(bill.id)}')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        const escapedPartyKey = escapeHtml(group.partyKey).replace(/'/g, "\\'");
+
+        return `
+          <div class="party-group ${isCollapsed ? 'is-collapsed' : ''}" id="${safeId}" data-party-key="${escapeHtml(group.partyKey)}">
+            <div class="party-group-header" role="button" tabindex="0" aria-expanded="${!isCollapsed}" onclick="togglePartyGroup('${escapedPartyKey}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePartyGroup('${escapedPartyKey}');}">
+              <div class="party-header-info">
+                <div class="party-name-row">
+                  <span class="party-name-label">PARTY:</span>
+                  <span class="party-name-title">${escapeHtml(group.partyName)}</span>
+                </div>
+                <div class="party-meta-row">
+                  <span class="party-bills-badge">${group.billCount} Bill${group.billCount === 1 ? '' : 's'}</span>
+                  <span class="party-total-badge">Total: ${formatCurrency(group.totalAmount)}</span>
+                </div>
+              </div>
+              <div class="party-chevron-box" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
+            <div class="party-bills-list">
+              ${billsHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      cardsContainer.innerHTML = groupsHtml;
+    }
+
+    function openBillInGenerator(id) {
+      const list = getHistoryList();
+      const bill = list.find(b => b.id === id);
+      if (!bill) return;
+
+      localStorage.setItem(STORAGE_KEY_CURRENT_BILL, JSON.stringify(bill));
+      window.location.href = '../index.html#preview';
+    }
+
+    function editBillInGenerator(id) {
+      const list = getHistoryList();
+      const bill = list.find(b => b.id === id);
+      if (!bill) return;
+
+      localStorage.setItem(STORAGE_KEY_CURRENT_BILL, JSON.stringify(bill));
+      window.location.href = '../index.html#editor';
+    }
+
+    function deleteHistoryBill(id) {
+      const list = getHistoryList();
+      const bill = list.find(b => b.id === id);
+      if (!bill) return;
+
+      if (!confirm(`Delete Bill #${bill.billNo} from history?`)) return;
+
+      const updated = list.filter(b => b.id !== id);
+      saveHistoryList(updated);
+      renderHistoryCards();
+      showToast(`Bill #${bill.billNo} deleted.`, 'danger');
+    }
+
+    function handleClearAllHistory() {
+      const list = getHistoryList();
+      if (list.length === 0) {
+        showToast('History is already empty.', 'danger');
+        return;
+      }
+      if (!confirm('Are you sure you want to delete ALL saved bills history? This cannot be undone.')) return;
+
+      localStorage.removeItem(STORAGE_KEY_HISTORY);
+      renderHistoryCards();
+      showToast('All history cleared.', 'danger');
+    }
+
+    function clearHistorySearch() {
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+      }
+      renderHistoryCards();
+    }
+
+    // Global exports for inline HTML attributes
+    window.togglePartyGroup = togglePartyGroup;
+    window.expandAllPartyGroups = expandAllPartyGroups;
+    window.collapseAllPartyGroups = collapseAllPartyGroups;
+    window.openBillInGenerator = openBillInGenerator;
+    window.editBillInGenerator = editBillInGenerator;
+    window.deleteHistoryBill = deleteHistoryBill;
+    window.handleClearAllHistory = handleClearAllHistory;
+    window.clearHistorySearch = clearHistorySearch;
+
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => renderHistoryCards(e.target.value));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderHistoryCards();
+    });
+  </script>
 </body>
 </html>
