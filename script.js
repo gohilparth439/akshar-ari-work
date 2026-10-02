@@ -1,23 +1,29 @@
 /**
- * AKSHAR ARI WORK - Mobile-First Bill Generator
- * =============================================
- * Client-side JavaScript handling:
+ * AKSHAR ARI WORK - Mobile-First Bill Generator with Firebase Firestore Cloud Storage
+ * ===================================================================================
+ * Features:
  * - 10-item editable card layout (mobile) and table layout (desktop)
  * - Real-time calculation: Amount = Quantity × Rate
  * - Automatic Subtotal & Grand Total (Grand Total = Subtotal, NO discount)
- * - Manual Bill Number entry
- * - Optional Manual Party Challan No. entry
- * - Automatic today's date
- * - Party Name entry (NO mobile number)
- * - Clean tab switching: [1. ENTER BILL] / [2. BILL PREVIEW]
- * - Print and Direct Save-as-PDF handling (jsPDF + html2canvas)
- * - LocalStorage draft persistence for seamless page refreshes
+ * - Manual Bill Number entry & Optional Manual Party Challan No. entry
+ * - Automatic today's date & Party Name entry
+ * - Clean tab switching: [1. ENTER BILL] / [2. BILL PREVIEW] / [3. BILL HISTORY]
+ * - Devotional Motto: "॥ Jay Swaminarayan ॥" at top of preview & PDF
+ * - Direct Save-as-PDF (jsPDF + html2canvas) without print dialog
+ * - Native Print Bill (window.print())
+ * - Firebase Authentication (Email + Password for business owner)
+ * - Firebase Firestore Cloud Database (Primary source of truth for cross-device shared history)
+ * - User Data Isolation: users/{userId}/bills/{billId}
+ * - Party-name-wise grouped history with count & total billing badges
+ * - Instant search across Party Name, Bill No, and Party Challan No
+ * - Accordion expand / collapse for party groups
+ * - Safe migration of legacy localStorage history to Firestore Cloud
  */
 
 // Configuration Constants
 const TOTAL_ROWS = 10;
 const STORAGE_KEY_CURRENT_BILL = 'akshar_current_bill_draft';
-const STORAGE_KEY_HISTORY = 'akshar_bills_history';
+const STORAGE_KEY_LEGACY_HISTORY = 'akshar_bills_history';
 
 // DOM Element References
 const elements = {
@@ -40,12 +46,31 @@ const elements = {
   panelHistory: document.getElementById('panel-history'),
   historyBadge: document.getElementById('history-badge'),
 
+  // Cloud Status in Header
+  cloudStatusBtn: document.getElementById('cloud-status-btn'),
+  cloudStatusText: document.getElementById('cloud-status-text'),
+
+  // Edit Mode Active Banner
+  editingModeBanner: document.getElementById('editing-mode-banner'),
+  editingBillLabel: document.getElementById('editing-bill-label'),
+
   // History Controls
+  historySearchCard: document.getElementById('history-search-card'),
   historySearchInput: document.getElementById('history-search-input'),
   btnClearSearch: document.getElementById('btn-clear-search'),
   historyCountText: document.getElementById('history-count-text'),
   historyCardsContainer: document.getElementById('history-cards-container'),
   btnClearHistory: document.getElementById('btn-clear-history'),
+  btnRefreshHistory: document.getElementById('btn-refresh-history'),
+  historyAuthRequired: document.getElementById('history-auth-required'),
+
+  // Migration Elements
+  migrationBanner: document.getElementById('migration-banner'),
+  localBillsCount: document.getElementById('local-bills-count'),
+  migrateModal: document.getElementById('migrate-modal'),
+  modalLocalBillsCount: document.getElementById('modal-local-bills-count'),
+  migrateStatusBox: document.getElementById('migrate-status-box'),
+  btnConfirmMigrate: document.getElementById('btn-confirm-migrate'),
 
   // Action Buttons
   btnNewBill: document.getElementById('btn-new-bill'),
@@ -68,9 +93,44 @@ const elements = {
   viewSubtotal: document.getElementById('view-subtotal'),
   viewGrandTotal: document.getElementById('view-grandtotal'),
 
+  // Modals
+  authModal: document.getElementById('auth-modal'),
+  authModalTitleText: document.getElementById('auth-modal-title-text'),
+  authModalDesc: document.getElementById('auth-modal-desc'),
+  authConfigWarning: document.getElementById('auth-config-warning'),
+  authForm: document.getElementById('auth-form'),
+  authEmail: document.getElementById('auth-email'),
+  authPassword: document.getElementById('auth-password'),
+  authErrorMsg: document.getElementById('auth-error-msg'),
+  btnAuthSubmit: document.getElementById('btn-auth-submit'),
+  btnAuthSubmitText: document.getElementById('btn-auth-submit-text'),
+  authTogglePrompt: document.getElementById('auth-toggle-prompt'),
+  btnAuthModeToggle: document.getElementById('btn-auth-mode-toggle'),
+
+  accountModal: document.getElementById('account-modal'),
+  accountUserEmail: document.getElementById('account-user-email'),
+  accountCloudStatus: document.getElementById('account-cloud-status'),
+  accountBillsCount: document.getElementById('account-bills-count'),
+
+  deleteModal: document.getElementById('delete-modal'),
+  deleteBillInfo: document.getElementById('delete-bill-info'),
+  btnConfirmDelete: document.getElementById('btn-confirm-delete'),
+
   // Toast
   toast: document.getElementById('toast'),
 };
+
+// Application State Variables
+let currentUser = null;
+let activeEditingBillId = null;
+let firestoreBills = [];
+let isCloudSaving = false;
+let isCloudDeleting = false;
+let isCloudMigrating = false;
+let billIdToDelete = null;
+let authMode = 'login'; // 'login' | 'register'
+let unsubscribeBillsListener = null;
+const collapsedPartyKeys = new Set();
 
 /**
  * Format a number into Indian Rupee Currency display (e.g. ₹ 72,000.00)
@@ -126,7 +186,7 @@ function showToast(message, type = 'success') {
   
   toastTimeout = setTimeout(() => {
     elements.toast.className = 'toast';
-  }, 3000);
+  }, 3200);
 }
 
 /**
@@ -134,12 +194,10 @@ function showToast(message, type = 'success') {
  * @param {'editor' | 'preview' | 'history'} target 
  */
 function switchTab(target) {
-  // Hide all panels safely
   if (elements.panelEditor) elements.panelEditor.style.display = 'none';
   if (elements.panelPreview) elements.panelPreview.style.display = 'none';
   if (elements.panelHistory) elements.panelHistory.style.display = 'none';
 
-  // Deactivate all tab buttons
   if (elements.tabEditor) elements.tabEditor.classList.remove('active');
   if (elements.tabPreview) elements.tabPreview.classList.remove('active');
   if (elements.tabHistory) elements.tabHistory.classList.remove('active');
@@ -150,13 +208,45 @@ function switchTab(target) {
   } else if (target === 'history') {
     if (elements.panelHistory) elements.panelHistory.style.display = 'block';
     if (elements.tabHistory) elements.tabHistory.classList.add('active');
-    renderHistoryCards();
+    
+    // Check if user is logged in
+    if (!currentUser) {
+      if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'block';
+      if (elements.historySearchCard) elements.historySearchCard.style.display = 'none';
+      if (elements.historyCardsContainer) elements.historyCardsContainer.innerHTML = '';
+    } else {
+      if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'none';
+      if (elements.historySearchCard) elements.historySearchCard.style.display = 'block';
+      renderHistoryCards();
+      checkLocalHistoryForMigration();
+    }
   } else {
     // Default to editor
     if (elements.panelEditor) elements.panelEditor.style.display = 'block';
     if (elements.tabEditor) elements.tabEditor.classList.add('active');
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/**
+ * Update the Cloud Connection Status indicator badge
+ * @param {'connected' | 'problem' | 'disconnected' | 'config' | 'checking'} status
+ * @param {string} label
+ */
+function updateCloudStatus(status, label) {
+  if (!elements.cloudStatusBtn || !elements.cloudStatusText) return;
+  elements.cloudStatusBtn.className = `cloud-status-badge status-${status}`;
+  elements.cloudStatusText.textContent = label;
+
+  if (status === 'connected') {
+    elements.cloudStatusBtn.title = `Connected to Firebase Firestore (${currentUser ? currentUser.email : ''}). Tap to view account.`;
+  } else if (status === 'config') {
+    elements.cloudStatusBtn.title = "Firebase configuration missing. Tap for setup details.";
+  } else if (status === 'problem') {
+    elements.cloudStatusBtn.title = "Cloud Connection Problem. Check internet and Firebase.";
+  } else {
+    elements.cloudStatusBtn.title = "Not connected. Tap to log in with your business account.";
+  }
 }
 
 /**
@@ -227,7 +317,7 @@ function calculateAndSync() {
   // Sync Bill Meta & Party Info to Preview
   syncPartyAndMetaToPreview();
 
-  // Save state to localStorage
+  // Save current form inputs to localStorage as draft so browser refresh never loses typing
   saveCurrentDraftToStorage();
 }
 
@@ -323,6 +413,7 @@ function saveCurrentDraftToStorage() {
     challanNo: elements.challanNoInput ? elements.challanNoInput.value : '',
     billDate: elements.billDateInput ? elements.billDateInput.value : '',
     partyName: elements.partyNameInput ? elements.partyNameInput.value : '',
+    activeEditingBillId: activeEditingBillId,
     items: items
   };
 
@@ -361,6 +452,12 @@ function loadDraftFromStorage() {
         }
       }
 
+      if (draft.activeEditingBillId) {
+        activeEditingBillId = draft.activeEditingBillId;
+        if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'flex';
+        if (elements.editingBillLabel) elements.editingBillLabel.textContent = `Bill #${draft.billNo || '---'}`;
+      }
+
       if (Array.isArray(draft.items)) {
         draft.items.forEach((item, index) => {
           const rowNum = index + 1;
@@ -383,323 +480,157 @@ function loadDraftFromStorage() {
   calculateAndSync();
 }
 
-/**
- * Handle "Generate Bill" action:
- * - Validates Bill No (must not be empty, otherwise shows "Please enter Bill No.")
- * - Party Challan No is OPTIONAL (bill generates smoothly even if blank)
- * - Reads Date and Party Name
- * - Calculates Amount for every row: Amount = Quantity × Rate
- * - Calculates Subtotal and Grand Total (Grand Total = Subtotal)
- * - Updates the Bill Preview DOM
- * - Automatically switches to: 2. BILL PREVIEW
- * - Does NOT reload the page or lose data
- * @returns {boolean} true if generated successfully, false if validation failed
- */
-function generateBill() {
-  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
-
-  // If there is no Bill No., show: "Please enter Bill No."
-  if (!billNoVal) {
-    showToast('Please enter Bill No.', 'danger');
-    if (elements.billNoInput) {
-      if (elements.panelEditor && elements.panelEditor.style.display === 'none') {
-        switchTab('editor');
-      }
-      elements.billNoInput.focus();
-      elements.billNoInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      elements.billNoInput.classList.add('input-error');
-      setTimeout(() => {
-        if (elements.billNoInput) elements.billNoInput.classList.remove('input-error');
-      }, 2500);
-    }
-    return false;
-  }
-
-  // Calculate and sync preview with all entered values
-  calculateAndSync();
-
-  // Save current bill to history automatically (in-place duplicate prevention)
-  saveCurrentBillToHistory();
-
-  // Switch to preview tab
-  switchTab('preview');
-  showToast('Bill generated & saved to history!', 'success');
-  return true;
-}
-
-let isPrinting = false;
-let isGeneratingPdf = false;
+/* ==========================================================================
+   FIREBASE AUTHENTICATION & CLOUD FIRESTORE LOGIC
+   ========================================================================== */
 
 /**
- * Handle "Save as PDF" action:
- * - Directly generates and downloads the PDF file using client-side libraries (jsPDF + html2canvas)
- * - NEVER calls window.print()
- * - Strictly single-page A4 format (210mm x 297mm) with 10mm margins
- * - Filename: AKSHAR_ARI_WORK_BILL_[BILL_NO].pdf (e.g. AKSHAR_ARI_WORK_BILL_1.pdf)
- * - Shows Party Challan No if entered, hides completely if blank
- * - Pure client-side execution, fully compatible with Android mobile Chrome & GitHub Pages
- * - Shows "Generating PDF..." toast during creation
- * - Does NOT reload the page or lose any entered data
+ * Initialize Firebase Auth and Firestore Cloud Database
  */
-async function saveAsPDF() {
-  if (isGeneratingPdf) return;
-
-  // Validate Bill No and sync data (shows "Please enter Bill No." if missing)
-  const isGenerated = generateBill();
-  if (!isGenerated) return;
-
-  const billPreview = document.getElementById('bill-preview');
-  if (!billPreview) {
-    showToast('Error: Bill preview element not found.', 'danger');
+function initFirebaseSystem() {
+  if (typeof isFirebaseConfigured !== 'function' || !isFirebaseConfigured()) {
+    updateCloudStatus('config', '● Cloud Not Configured');
+    if (elements.authConfigWarning) elements.authConfigWarning.style.display = 'block';
     return;
   }
 
-  isGeneratingPdf = true;
-  showToast('Generating PDF... Please wait.', 'success');
-
-  // Disable PDF buttons temporarily during generation
-  const pdfButtons = [elements.btnPdf, elements.btnPreviewPdf].filter(Boolean);
-  pdfButtons.forEach(btn => {
-    btn.disabled = true;
-    btn.style.opacity = '0.7';
-  });
-
-  // Determine safe filename: AKSHAR_ARI_WORK_BILL_[BILL_NO].pdf
-  const billNoRaw = elements.billNoInput ? elements.billNoInput.value.trim() : '1';
-  const safeBillNo = billNoRaw.replace(/[^a-zA-Z0-9_-]/g, '_') || '1';
-  const fileName = `AKSHAR_ARI_WORK_BILL_${safeBillNo}.pdf`;
-
-  // Create an off-screen clone with .pdf-render-mode to guarantee 794px A4 desktop layout
-  // regardless of whether generated on a 320px phone or a desktop monitor
-  const clone = billPreview.cloneNode(true);
-  clone.id = 'bill-preview-pdf-clone';
-  clone.classList.add('pdf-render-mode');
-  clone.style.position = 'fixed';
-  clone.style.left = '0';
-  clone.style.top = '0';
-  clone.style.width = '794px';
-  clone.style.zIndex = '-9999';
-  clone.style.opacity = '1';
-  clone.style.visibility = 'visible';
-  clone.style.pointerEvents = 'none';
-  document.body.appendChild(clone);
-
   try {
-    const hasHtml2Canvas = typeof window.html2canvas === 'function';
-    const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
+      firebaseAuth = firebase.auth();
+      firestoreDb = firebase.firestore();
 
-    if (hasHtml2Canvas && jsPDFClass) {
-      // High-resolution canvas capture (scale: 2 = 1588px width)
-      const canvas = await window.html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1024
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-
-      // Create portrait A4 PDF in mm
-      const pdf = new jsPDFClass({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
-
-      // A4 page: 210mm x 297mm. Available printable area with 10mm margins = 190mm x 277mm
-      let pdfWidth = 190;
-      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      // Mathematically guarantee content NEVER overflows onto a second page
-      if (pdfHeight > 277) {
-        const scaleFactor = 277 / pdfHeight;
-        pdfHeight = 277;
-        pdfWidth = pdfWidth * scaleFactor;
-      }
-
-      const x = (210 - pdfWidth) / 2;
-      const y = 10;
-
-      pdf.addImage(imgData, 'PNG', x, y, pdfWidth, pdfHeight, undefined, 'FAST');
-      pdf.save(fileName);
-
-      showToast(`PDF downloaded: ${fileName}`, 'success');
-    } else if (typeof window.html2pdf === 'function') {
-      // Fallback to html2pdf if global structure differs
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, windowWidth: 1024, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      await window.html2pdf().set(opt).from(clone).save();
-      showToast(`PDF downloaded: ${fileName}`, 'success');
+      // Listen to auth state changes across all browser tabs
+      firebaseAuth.onAuthStateChanged(handleAuthStateChanged);
     } else {
-      throw new Error('PDF library is not loaded. Please check your internet connection and refresh.');
+      updateCloudStatus('problem', '● Cloud Connection Problem');
     }
   } catch (err) {
-    console.error('Error generating PDF:', err);
-    showToast(`PDF generation error: ${err.message || 'Please try again'}`, 'danger');
-  } finally {
-    // Clean up off-screen clone from DOM
-    if (clone && clone.parentNode) {
-      clone.parentNode.removeChild(clone);
+    console.error("Firebase init error in script:", err);
+    updateCloudStatus('problem', '● Cloud Connection Problem');
+  }
+}
+
+/**
+ * Handle Firebase Auth state changes
+ * @param {Object|null} user 
+ */
+function handleAuthStateChanged(user) {
+  if (user) {
+    currentUser = user;
+    updateCloudStatus('connected', '● Cloud Connected');
+
+    if (elements.accountUserEmail) elements.accountUserEmail.textContent = user.email || 'Business Owner';
+    if (elements.accountCloudStatus) elements.accountCloudStatus.textContent = '● Cloud Connected';
+    if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'none';
+    if (elements.historySearchCard) elements.historySearchCard.style.display = 'block';
+
+    closeAuthModal();
+
+    // Subscribe to real-time Firestore bills under users/{userId}/bills
+    subscribeToFirestoreBills();
+
+    // Check if device has legacy localStorage bills to offer migration
+    checkLocalHistoryForMigration();
+  } else {
+    currentUser = null;
+    if (unsubscribeBillsListener) {
+      unsubscribeBillsListener();
+      unsubscribeBillsListener = null;
     }
-    // Re-enable PDF buttons
-    pdfButtons.forEach(btn => {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-    });
-    isGeneratingPdf = false;
+    firestoreBills = [];
+    updateCloudStatus('disconnected', '● Cloud Not Connected');
+
+    if (elements.historyBadge) elements.historyBadge.textContent = '0';
+    if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
+
+    // If currently on history tab, show login required
+    if (elements.panelHistory && elements.panelHistory.style.display !== 'none') {
+      if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'block';
+      if (elements.historySearchCard) elements.historySearchCard.style.display = 'none';
+      if (elements.historyCardsContainer) elements.historyCardsContainer.innerHTML = '';
+    }
   }
 }
 
 /**
- * Handle "Print Bill" action:
- * - Generates the bill and updates preview
- * - Calls native browser window.print() after a 500ms delay
+ * Subscribe to real-time updates from Firestore for the authenticated user
  */
-function printBill() {
-  if (isPrinting) return;
-  const isGenerated = generateBill();
-  if (!isGenerated) return;
+function subscribeToFirestoreBills() {
+  if (!currentUser || !firestoreDb) return;
 
-  isPrinting = true;
-  showToast('Opening print dialog...', 'success');
-  setTimeout(function() {
-    window.print();
-    setTimeout(function() { isPrinting = false; }, 1000);
-  }, 500);
-}
-
-/**
- * Handle "Clear" action:
- * Prompts confirmation before clearing Party Name, Party Challan No, and all 10 items
- */
-function handleClear() {
-  const confirmed = window.confirm('Are you sure you want to clear all entered party details and item fields?');
-  if (!confirmed) return;
-
-  if (elements.partyNameInput) elements.partyNameInput.value = '';
-  if (elements.challanNoInput) elements.challanNoInput.value = '';
-
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    if (descInput) descInput.value = '';
-    if (qtyInput) qtyInput.value = '';
-    if (rateInput) rateInput.value = '';
+  if (unsubscribeBillsListener) {
+    unsubscribeBillsListener();
   }
 
-  calculateAndSync();
-  showToast('Form fields cleared.', 'danger');
-}
-
-/**
- * Handle "New Bill" action:
- * - Bill No. field becomes blank for manual entry
- * - Clears Party Challan No
- * - Sets today's date
- * - Clears party name and all 10 items
- * - Resets subtotal & grand total
- * - Switches to Editor tab and focuses Bill No
- */
-function handleNewBill() {
-  const confirmed = window.confirm('Start a New Bill? This will clear all fields and prepare a fresh blank bill.');
-  if (!confirmed) return;
-
-  if (elements.billNoInput) elements.billNoInput.value = '';
-  if (elements.challanNoInput) elements.challanNoInput.value = '';
-  if (elements.billDateInput) elements.billDateInput.value = getTodayDateString();
-  if (elements.partyNameInput) elements.partyNameInput.value = '';
-
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    if (descInput) descInput.value = '';
-    if (qtyInput) qtyInput.value = '';
-    if (rateInput) rateInput.value = '';
+  // Show loading indicator on first subscription
+  if (elements.historyCardsContainer && firestoreBills.length === 0) {
+    elements.historyCardsContainer.innerHTML = `
+      <div class="history-loading-state">
+        <div class="spinner"></div>
+        <h3 class="empty-title">Loading History...</h3>
+        <p class="text-muted">Fetching your cloud bills from Firestore...</p>
+      </div>
+    `;
   }
 
-  calculateAndSync();
-  switchTab('editor');
-
-  if (elements.billNoInput) {
-    elements.billNoInput.focus();
-  }
-
-  showToast('New blank bill prepared. Enter Bill No to begin.', 'success');
-}
-
-/**
- * ==========================================================================
- * BILL HISTORY MANAGEMENT SYSTEM
- * ==========================================================================
- * - Persistent client-side storage in localStorage under 'akshar_bills_history'
- * - Auto-saves on every successful "Generate Bill"
- * - In-place duplicate prevention (updates record if matching billNo exists)
- * - Real-time search by Bill No., Challan No., or Party Name
- * - Fast View, Edit / Reuse, and Delete actions
- * - Real-time badge counter on navigation tab
- */
-
-/**
- * Retrieve the saved bills array from localStorage
- * @returns {Array<Object>}
- */
-function getHistoryList() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_HISTORY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const billsCollection = firestoreDb
+      .collection('users')
+      .doc(currentUser.uid)
+      .collection('bills');
+
+    unsubscribeBillsListener = billsCollection.onSnapshot(
+      (snapshot) => {
+        const loadedBills = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          loadedBills.push({
+            id: doc.id,
+            ...data
+          });
+        });
+
+        firestoreBills = loadedBills;
+        if (elements.historyBadge) elements.historyBadge.textContent = firestoreBills.length;
+        if (elements.accountBillsCount) elements.accountBillsCount.textContent = firestoreBills.length;
+
+        renderHistoryCards();
+        updateCloudStatus('connected', '● Cloud Connected');
+      },
+      (error) => {
+        console.error("Firestore onSnapshot error:", error);
+        updateCloudStatus('problem', '● Cloud Connection Problem');
+        showToast("Cloud connection error. Please check your internet or Firebase Security Rules.", "danger");
+      }
+    );
   } catch (err) {
-    console.error('Error reading bill history from localStorage:', err);
-    return [];
+    console.error("Error setting up Firestore listener:", err);
+    updateCloudStatus('problem', '● Cloud Connection Problem');
   }
 }
 
 /**
- * Persist the bills array to localStorage and update badge
- * @param {Array<Object>} list
+ * Save current bill to Firestore Cloud Database
+ * - Performs Firestore upsert under users/{userId}/bills/{billId}
+ * - Primary source of truth for history
+ * - Does not show success unless Firestore confirms the save
+ * @returns {Promise<boolean>}
  */
-function saveHistoryList(list) {
-  try {
-    localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(list));
-  } catch (err) {
-    console.error('Error saving bill history to localStorage:', err);
-    showToast('Warning: Storage is full or unavailable.', 'danger');
+async function saveCurrentBillToFirestore() {
+  // If not logged in, prompt login
+  if (!currentUser) {
+    openAuthModal();
+    showToast('Please log in with Firebase to save your bill to Cloud.', 'danger');
+    return false;
   }
-  updateHistoryBadge();
-}
 
-/**
- * Update the tab badge count with the total number of saved bills
- */
-function updateHistoryBadge() {
-  const list = getHistoryList();
-  if (elements.historyBadge) {
-    elements.historyBadge.textContent = list.length;
+  if (!firestoreDb) {
+    showToast('Cloud database is not initialized. Please verify firebase-config.js.', 'danger');
+    return false;
   }
-}
 
-/**
- * Save current bill draft to history on "Generate Bill":
- * - Collects Bill No, Challan No, Date, Party Name, 10 items, Subtotal, Grand Total
- * - Checks if a bill with matching Bill No already exists
- * - If found: updates record in-place and moves it to top (newest)
- * - If new: unshifts as newest record
- */
-function saveCurrentBillToHistory() {
   const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
-  if (!billNoVal) return;
+  if (!billNoVal) return false;
 
   const challanNoVal = elements.challanNoInput ? elements.challanNoInput.value.trim() : '';
   const dateVal = elements.billDateInput ? elements.billDateInput.value : getTodayDateString();
@@ -722,62 +653,341 @@ function saveCurrentBillToHistory() {
     subtotal += amount;
 
     items.push({
-      desc: desc,
-      qty: qtyInput ? qtyInput.value : '',
-      rate: rateInput ? rateInput.value : '',
+      srNo: i,
+      description: desc,
+      quantity: qty,
+      rate: rate,
       amount: amount
     });
   }
 
   const grandTotal = subtotal;
-  const historyList = getHistoryList();
-  const nowIso = new Date().toISOString();
+  const isEditing = Boolean(activeEditingBillId);
 
-  // Check for existing bill with same Bill No (case-insensitive)
-  const existingIndex = historyList.findIndex(
-    b => b.billNo && b.billNo.trim().toLowerCase() === billNoVal.toLowerCase()
-  );
+  // Disable duplicate clicks while saving
+  isCloudSaving = true;
+  const actionButtons = [elements.btnGenerate, elements.btnPdf, elements.btnPrint].filter(Boolean);
+  actionButtons.forEach(btn => { btn.disabled = true; });
 
-  if (existingIndex !== -1) {
-    // In-place update existing record and move to top
-    const existingBill = historyList[existingIndex];
-    existingBill.billNo = billNoVal;
-    existingBill.challanNo = challanNoVal;
-    existingBill.billDate = dateVal;
-    existingBill.partyName = partyNameVal;
-    existingBill.items = items;
-    existingBill.subtotal = subtotal;
-    existingBill.grandTotal = grandTotal;
-    existingBill.updatedAt = nowIso;
+  showToast(isEditing ? 'Updating Bill...' : 'Saving Bill...', 'success');
 
-    // Move to front (newest)
-    historyList.splice(existingIndex, 1);
-    historyList.unshift(existingBill);
-  } else {
-    // Create new bill entry
-    const newBill = {
-      id: 'bill_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+  try {
+    const userBillsRef = firestoreDb
+      .collection('users')
+      .doc(currentUser.uid)
+      .collection('bills');
+
+    const billData = {
       billNo: billNoVal,
-      challanNo: challanNoVal,
+      partyChallanNo: challanNoVal,
       billDate: dateVal,
       partyName: partyNameVal,
-      items: items,
       subtotal: subtotal,
       grandTotal: grandTotal,
-      createdAt: nowIso,
-      updatedAt: nowIso
+      items: items,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    historyList.unshift(newBill);
-  }
 
-  saveHistoryList(historyList);
+    if (isEditing) {
+      // Update existing Firestore document
+      await userBillsRef.doc(activeEditingBillId).update(billData);
+      showToast('Bill updated successfully.', 'success');
+      activeEditingBillId = null;
+      if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'none';
+    } else {
+      // Check if a bill with same Bill No already exists for this user (prevent duplicate)
+      const existing = firestoreBills.find(
+        b => b.billNo && b.billNo.trim().toLowerCase() === billNoVal.toLowerCase()
+      );
+
+      if (existing) {
+        // Update the existing document in place
+        await userBillsRef.doc(existing.id).update(billData);
+        showToast('Bill updated successfully.', 'success');
+      } else {
+        // Create new document
+        billData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await userBillsRef.add(billData);
+        showToast('Bill saved successfully.', 'success');
+      }
+    }
+
+    updateCloudStatus('connected', '● Cloud Connected');
+    return true;
+  } catch (err) {
+    console.error('Error saving bill to Firestore:', err);
+    updateCloudStatus('problem', '● Cloud Connection Problem');
+    showToast('Unable to save bill. Please check your internet connection and Firebase configuration.', 'danger');
+    return false;
+  } finally {
+    isCloudSaving = false;
+    actionButtons.forEach(btn => { btn.disabled = false; });
+  }
 }
 
-// State tracking for collapsed party groups
-const collapsedPartyKeys = new Set();
+/**
+ * Handle "Generate Bill" action:
+ * - Validates Bill No (must not be empty, otherwise shows "Please enter Bill No.")
+ * - Calculates all row amounts and totals
+ * - Updates Bill Preview DOM
+ * - Automatically switches to: 2. BILL PREVIEW
+ * - Saves bill to Firestore Cloud database
+ * - Does NOT reload the page or lose data
+ */
+async function generateBill() {
+  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
+
+  // If there is no Bill No., show: "Please enter Bill No."
+  if (!billNoVal) {
+    showToast('Please enter Bill No.', 'danger');
+    if (elements.billNoInput) {
+      if (elements.panelEditor && elements.panelEditor.style.display === 'none') {
+        switchTab('editor');
+      }
+      elements.billNoInput.focus();
+      elements.billNoInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      elements.billNoInput.classList.add('input-error');
+      setTimeout(() => {
+        if (elements.billNoInput) elements.billNoInput.classList.remove('input-error');
+      }, 2500);
+    }
+    return false;
+  }
+
+  // Calculate and sync preview with all entered values
+  calculateAndSync();
+
+  // Switch to preview tab immediately so user sees the generated bill
+  switchTab('preview');
+
+  // Save current bill to Firestore Cloud
+  await saveCurrentBillToFirestore();
+
+  return true;
+}
+
+let isPrinting = false;
+let isGeneratingPdf = false;
 
 /**
- * Group a flat list of bills into party groups
+ * Handle "Save as PDF" action:
+ * - Directly generates and downloads the PDF file using client-side libraries (jsPDF + html2canvas)
+ * - NEVER calls window.print()
+ * - Strictly single-page A4 format (210mm x 297mm) with 10mm margins
+ * - Filename: AKSHAR_ARI_WORK_BILL_[BILL_NO].pdf (e.g. AKSHAR_ARI_WORK_BILL_1.pdf)
+ * - Pure client-side execution, fully compatible with Android mobile Chrome & GitHub Pages
+ * - Does NOT reload the page or lose any entered data
+ */
+async function saveAsPDF() {
+  if (isGeneratingPdf) return;
+
+  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
+  if (!billNoVal) {
+    showToast('Please enter Bill No.', 'danger');
+    switchTab('editor');
+    if (elements.billNoInput) elements.billNoInput.focus();
+    return;
+  }
+
+  calculateAndSync();
+  switchTab('preview');
+
+  const billPreview = document.getElementById('bill-preview');
+  if (!billPreview) {
+    showToast('Error: Bill preview element not found.', 'danger');
+    return;
+  }
+
+  isGeneratingPdf = true;
+  showToast('Generating PDF... Please wait.', 'success');
+
+  const pdfButtons = [elements.btnPdf, elements.btnPreviewPdf].filter(Boolean);
+  pdfButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+  });
+
+  const billNoRaw = elements.billNoInput ? elements.billNoInput.value.trim() : '1';
+  const safeBillNo = billNoRaw.replace(/[^a-zA-Z0-9_-]/g, '_') || '1';
+  const fileName = `AKSHAR_ARI_WORK_BILL_${safeBillNo}.pdf`;
+
+  // Create off-screen clone with .pdf-render-mode to guarantee 794px A4 desktop layout
+  const clone = billPreview.cloneNode(true);
+  clone.id = 'bill-preview-pdf-clone';
+  clone.classList.add('pdf-render-mode');
+  clone.style.position = 'fixed';
+  clone.style.left = '0';
+  clone.style.top = '0';
+  clone.style.width = '794px';
+  clone.style.zIndex = '-9999';
+  clone.style.opacity = '1';
+  clone.style.visibility = 'visible';
+  clone.style.pointerEvents = 'none';
+  document.body.appendChild(clone);
+
+  try {
+    const hasHtml2Canvas = typeof window.html2canvas === 'function';
+    const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+
+    if (hasHtml2Canvas && jsPDFClass) {
+      const canvas = await window.html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1024
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDFClass({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+
+      let pdfWidth = 190;
+      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      if (pdfHeight > 277) {
+        const scaleFactor = 277 / pdfHeight;
+        pdfHeight = 277;
+        pdfWidth = pdfWidth * scaleFactor;
+      }
+
+      const x = (210 - pdfWidth) / 2;
+      const y = 10;
+
+      pdf.addImage(imgData, 'PNG', x, y, pdfWidth, pdfHeight, undefined, 'FAST');
+      pdf.save(fileName);
+
+      showToast(`PDF downloaded: ${fileName}`, 'success');
+    } else if (typeof window.html2pdf === 'function') {
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, windowWidth: 1024, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      await window.html2pdf().set(opt).from(clone).save();
+      showToast(`PDF downloaded: ${fileName}`, 'success');
+    } else {
+      throw new Error('PDF library is not loaded. Please check your internet connection.');
+    }
+  } catch (err) {
+    console.error('Error generating PDF:', err);
+    showToast(`PDF generation error: ${err.message || 'Please try again'}`, 'danger');
+  } finally {
+    if (clone && clone.parentNode) {
+      clone.parentNode.removeChild(clone);
+    }
+    pdfButtons.forEach(btn => {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    });
+    isGeneratingPdf = false;
+  }
+}
+
+/**
+ * Handle "Print Bill" action:
+ * - Generates the bill and updates preview
+ * - Calls native browser window.print() after a 500ms delay
+ */
+function printBill() {
+  if (isPrinting) return;
+  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
+  if (!billNoVal) {
+    showToast('Please enter Bill No.', 'danger');
+    switchTab('editor');
+    if (elements.billNoInput) elements.billNoInput.focus();
+    return;
+  }
+
+  calculateAndSync();
+  switchTab('preview');
+
+  isPrinting = true;
+  showToast('Opening print dialog...', 'success');
+  setTimeout(function() {
+    window.print();
+    setTimeout(function() { isPrinting = false; }, 1000);
+  }, 500);
+}
+
+/**
+ * Handle "Clear" action:
+ * Prompts confirmation before clearing form fields
+ */
+function handleClear() {
+  const confirmed = window.confirm('Are you sure you want to clear all entered party details and item fields?');
+  if (!confirmed) return;
+
+  if (elements.partyNameInput) elements.partyNameInput.value = '';
+  if (elements.challanNoInput) elements.challanNoInput.value = '';
+
+  for (let i = 1; i <= TOTAL_ROWS; i++) {
+    const descInput = document.getElementById(`item-desc-${i}`);
+    const qtyInput = document.getElementById(`item-qty-${i}`);
+    const rateInput = document.getElementById(`item-rate-${i}`);
+
+    if (descInput) descInput.value = '';
+    if (qtyInput) qtyInput.value = '';
+    if (rateInput) rateInput.value = '';
+  }
+
+  cancelEditMode(false);
+  calculateAndSync();
+  showToast('Form fields cleared.', 'danger');
+}
+
+/**
+ * Handle "+ New Bill" action:
+ * Resets form, advances Bill No if desired, and clears active edit mode
+ */
+function handleNewBill() {
+  const confirmed = window.confirm('Start a new bill? Any unsaved changes on the current form will be reset.');
+  if (!confirmed) return;
+
+  if (elements.billNoInput) elements.billNoInput.value = '';
+  if (elements.challanNoInput) elements.challanNoInput.value = '';
+  if (elements.partyNameInput) elements.partyNameInput.value = '';
+  if (elements.billDateInput) elements.billDateInput.value = getTodayDateString();
+
+  for (let i = 1; i <= TOTAL_ROWS; i++) {
+    const descInput = document.getElementById(`item-desc-${i}`);
+    const qtyInput = document.getElementById(`item-qty-${i}`);
+    const rateInput = document.getElementById(`item-rate-${i}`);
+
+    if (descInput) descInput.value = '';
+    if (qtyInput) qtyInput.value = '';
+    if (rateInput) rateInput.value = '';
+  }
+
+  cancelEditMode(false);
+  calculateAndSync();
+  switchTab('editor');
+  showToast('New blank bill ready.', 'success');
+}
+
+/**
+ * Cancel active edit mode and revert to standard creation
+ * @param {boolean} notify
+ */
+function cancelEditMode(notify = true) {
+  activeEditingBillId = null;
+  if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'none';
+  saveCurrentDraftToStorage();
+  if (notify) showToast('Edit mode cancelled.', 'success');
+}
+
+/* ==========================================================================
+   PARTY-NAME-WISE HISTORY DISPLAY & SEARCH
+   ========================================================================== */
+
+/**
+ * Group bills by Party Name
  * @param {Array<Object>} bills
  * @returns {Array<Object>}
  */
@@ -801,7 +1011,6 @@ function groupBillsByParty(bills) {
     }
 
     const group = groupsMap.get(partyKey);
-    // Keep the best formatted version of party name
     if (group.partyName === 'General / Cash' && rawParty) {
       group.partyName = displayParty;
     }
@@ -811,9 +1020,13 @@ function groupBillsByParty(bills) {
     group.totalAmount += amount;
     group.billCount++;
 
-    // Track latest bill timestamp for recency sorting
-    const billTimestamp = bill.createdAt ? new Date(bill.createdAt).getTime() : 
-                          (bill.billDate ? new Date(bill.billDate).getTime() : 0);
+    // Track latest bill timestamp for sorting
+    let billTimestamp = 0;
+    if (bill.createdAt) {
+      billTimestamp = bill.createdAt.toMillis ? bill.createdAt.toMillis() : new Date(bill.createdAt).getTime();
+    } else if (bill.billDate) {
+      billTimestamp = new Date(bill.billDate).getTime();
+    }
     if (billTimestamp > group.latestTimestamp) {
       group.latestTimestamp = billTimestamp;
     }
@@ -824,31 +1037,25 @@ function groupBillsByParty(bills) {
   // Sort bills newest first within each party group
   partyGroups.forEach(group => {
     group.bills.sort((a, b) => {
-      // 1. Compare billDate descending (YYYY-MM-DD)
       const dateA = a.billDate || '';
       const dateB = b.billDate || '';
       if (dateA !== dateB) {
         return dateB.localeCompare(dateA);
       }
-      // 2. Compare updatedAt or createdAt descending
       const timeA = a.updatedAt || a.createdAt || '';
       const timeB = b.updatedAt || b.createdAt || '';
-      if (timeA !== timeB) {
-        return timeB.localeCompare(timeA);
-      }
-      // 3. Fallback to id
-      return (b.id || '').localeCompare(a.id || '');
+      return String(timeB).localeCompare(String(timeA));
     });
   });
 
-  // Sort party groups by latest bill activity descending
+  // Sort party groups by latest activity descending
   partyGroups.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
 
   return partyGroups;
 }
 
 /**
- * Toggle collapse/expand state for a specific party group
+ * Toggle collapse/expand for a specific party group
  * @param {string} partyKey
  */
 function togglePartyGroup(partyKey) {
@@ -859,15 +1066,15 @@ function togglePartyGroup(partyKey) {
     collapsedPartyKeys.delete(partyKey);
     if (groupEl) {
       groupEl.classList.remove('is-collapsed');
-      const btn = groupEl.querySelector('.party-group-header');
-      if (btn) btn.setAttribute('aria-expanded', 'true');
+      const headerBtn = groupEl.querySelector('.party-group-header');
+      if (headerBtn) headerBtn.setAttribute('aria-expanded', 'true');
     }
   } else {
     collapsedPartyKeys.add(partyKey);
     if (groupEl) {
       groupEl.classList.add('is-collapsed');
-      const btn = groupEl.querySelector('.party-group-header');
-      if (btn) btn.setAttribute('aria-expanded', 'false');
+      const headerBtn = groupEl.querySelector('.party-group-header');
+      if (headerBtn) headerBtn.setAttribute('aria-expanded', 'false');
     }
   }
 }
@@ -906,24 +1113,26 @@ function collapseAllPartyGroups() {
 function renderHistoryCards(filterQuery = null) {
   if (!elements.historyCardsContainer) return;
 
-  const allBills = getHistoryList();
+  if (!currentUser) {
+    if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'block';
+    if (elements.historySearchCard) elements.historySearchCard.style.display = 'none';
+    elements.historyCardsContainer.innerHTML = '';
+    return;
+  }
+
   const query = (filterQuery !== null ? filterQuery : (elements.historySearchInput ? elements.historySearchInput.value : '')).trim().toLowerCase();
 
-  // Toggle search clear button
   if (elements.btnClearSearch) {
     elements.btnClearSearch.style.display = query ? 'block' : 'none';
   }
 
-  // Handle empty state (no bills saved at all)
-  if (allBills.length === 0) {
-    if (elements.historyCountText) {
-      elements.historyCountText.textContent = '0 saved bills';
-    }
+  if (firestoreBills.length === 0) {
+    if (elements.historyCountText) elements.historyCountText.textContent = '0 saved bills';
     elements.historyCardsContainer.innerHTML = `
       <div class="history-empty-state">
         <div class="empty-icon">📋</div>
-        <h3 class="empty-title">No Saved Bills Yet</h3>
-        <p class="empty-desc">Bills generated in "Enter Bill" will automatically be grouped by Party Name here for easy access, reprinting, or editing.</p>
+        <h3 class="empty-title">No Saved Bills in Cloud</h3>
+        <p class="empty-desc">Bills generated in "1. ENTER BILL" are automatically saved to your Firestore Cloud database and organized by Party Name here.</p>
         <button class="btn btn-primary" type="button" onclick="switchTab('editor')">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Create First Bill
@@ -933,33 +1142,27 @@ function renderHistoryCards(filterQuery = null) {
     return;
   }
 
-  // Group all bills by party name
-  const allPartyGroups = groupBillsByParty(allBills);
+  const allPartyGroups = groupBillsByParty(firestoreBills);
 
-  // If query is present, filter party groups or matching bills
+  // Filter party groups or matching bills by Party Name, Bill No, or Challan No
   let displayGroups = allPartyGroups;
   if (query) {
     displayGroups = [];
     allPartyGroups.forEach(group => {
       const matchParty = group.partyName.toLowerCase().includes(query);
       if (matchParty) {
-        // Party name matches, show all bills of this party
         displayGroups.push(group);
-        // Auto-expand this group so user sees results immediately
         collapsedPartyKeys.delete(group.partyKey);
       } else {
-        // Check if any bills inside match billNo or challanNo
-        const matchingBills = group.bills.filter(b => 
-          (b.billNo || '').toLowerCase().includes(query) ||
-          (b.challanNo || '').toLowerCase().includes(query)
-        );
+        const matchingBills = group.bills.filter(b => {
+          const matchBillNo = (b.billNo || '').toLowerCase().includes(query);
+          const matchChallan = (b.partyChallanNo || b.challanNo || '').toLowerCase().includes(query);
+          return matchBillNo || matchChallan;
+        });
         if (matchingBills.length > 0) {
-          const matchingTotal = matchingBills.reduce((sum, b) => sum + (Number(b.grandTotal) || 0), 0);
           displayGroups.push({
             ...group,
-            bills: matchingBills,
-            billCount: matchingBills.length,
-            totalAmount: matchingTotal
+            bills: matchingBills
           });
           collapsedPartyKeys.delete(group.partyKey);
         }
@@ -968,14 +1171,13 @@ function renderHistoryCards(filterQuery = null) {
   }
 
   // Update stats text
-  const totalBillsCount = displayGroups.reduce((sum, g) => sum + g.billCount, 0);
-  const totalAmountSum = displayGroups.reduce((sum, g) => sum + g.totalAmount, 0);
-
   if (elements.historyCountText) {
+    const totalMatchingBills = displayGroups.reduce((acc, g) => acc + g.bills.length, 0);
+    const partyWord = displayGroups.length === 1 ? 'party' : 'parties';
     if (query) {
-      elements.historyCountText.textContent = `Showing ${displayGroups.length} Part${displayGroups.length === 1 ? 'y' : 'ies'} (${totalBillsCount} Bill${totalBillsCount === 1 ? '' : 's'})`;
+      elements.historyCountText.textContent = `Showing ${displayGroups.length} ${partyWord} (${totalMatchingBills} of ${firestoreBills.length} bills)`;
     } else {
-      elements.historyCountText.textContent = `${displayGroups.length} Part${displayGroups.length === 1 ? 'y' : 'ies'} • ${totalBillsCount} Bills • Total: ${formatCurrency(totalAmountSum)}`;
+      elements.historyCountText.textContent = `${displayGroups.length} ${partyWord} • ${firestoreBills.length} total bills`;
     }
   }
 
@@ -983,8 +1185,8 @@ function renderHistoryCards(filterQuery = null) {
     elements.historyCardsContainer.innerHTML = `
       <div class="history-empty-state">
         <div class="empty-icon">🔍</div>
-        <h3 class="empty-title">No Matching Parties</h3>
-        <p class="empty-desc">No party name or bills found matching "<strong>${escapeHtml(query)}</strong>".</p>
+        <h3 class="empty-title">No Matching Parties or Bills</h3>
+        <p class="empty-desc">No party name, bill number, or challan number matching "<strong>${escapeHtml(query)}</strong>".</p>
         <button class="btn btn-secondary" type="button" onclick="clearHistorySearch()">Clear Search</button>
       </div>
     `;
@@ -996,19 +1198,19 @@ function renderHistoryCards(filterQuery = null) {
     const isCollapsed = collapsedPartyKeys.has(group.partyKey);
     const safeId = 'party-group-' + encodeURIComponent(group.partyKey).replace(/%/g, '_');
 
-    // Render bills inside this party (newest first)
     const billsHtml = group.bills.map(bill => {
-      const filledItems = (bill.items || []).filter(it => it.desc || parseFloat(it.qty) > 0 || parseFloat(it.rate) > 0);
-      const firstFilledDesc = filledItems.length > 0 && filledItems[0].desc ? filledItems[0].desc : 'No item descriptions';
-      const challanBadgeHtml = bill.challanNo 
-        ? `<span class="pb-challan-badge">Party Challan No: ${escapeHtml(bill.challanNo)}</span>`
+      const filledItems = (bill.items || []).filter(it => (it.desc || it.description) || parseFloat(it.qty || it.quantity) > 0 || parseFloat(it.rate) > 0);
+      const firstFilledDesc = filledItems.length > 0 && (filledItems[0].desc || filledItems[0].description) ? (filledItems[0].desc || filledItems[0].description) : 'No item descriptions';
+      const challanNo = bill.partyChallanNo || bill.challanNo;
+      const challanBadgeHtml = challanNo 
+        ? `<span class="pb-challan-badge">Challan: ${escapeHtml(challanNo)}</span>`
         : '';
 
       return `
         <div class="party-bill-card" id="h-card-${escapeHtml(bill.id)}">
           <div class="pb-meta-line">
             <div class="pb-badge-group">
-              <span class="pb-bill-badge">Bill No: ${escapeHtml(bill.billNo)}</span>
+              <span class="pb-bill-badge">Bill No: ${escapeHtml(bill.billNo || '---')}</span>
               ${challanBadgeHtml}
             </div>
             <span class="pb-date">Date: ${formatDateDisplay(bill.billDate)}</span>
@@ -1073,14 +1275,19 @@ function renderHistoryCards(filterQuery = null) {
 }
 
 /**
- * Load bill data into application inputs and synchronize state
- * @param {Object} bill
+ * Load selected Firestore bill into Form and set active editing mode
+ * @param {string} id
  */
-function populateBillData(bill) {
-  if (!bill) return;
+function editHistoryBill(id) {
+  const bill = firestoreBills.find(b => b.id === id);
+  if (!bill) {
+    showToast('Bill not found.', 'danger');
+    return;
+  }
 
+  // Load into inputs
   if (elements.billNoInput) elements.billNoInput.value = bill.billNo || '';
-  if (elements.challanNoInput) elements.challanNoInput.value = bill.challanNo || '';
+  if (elements.challanNoInput) elements.challanNoInput.value = bill.partyChallanNo || bill.challanNo || '';
   if (elements.billDateInput) elements.billDateInput.value = bill.billDate || getTodayDateString();
   if (elements.partyNameInput) elements.partyNameInput.value = bill.partyName || '';
 
@@ -1091,93 +1298,171 @@ function populateBillData(bill) {
     const rateInput = document.getElementById(`item-rate-${i}`);
 
     const item = items[i - 1];
-    if (descInput) descInput.value = item && item.desc !== undefined ? item.desc : '';
-    if (qtyInput) qtyInput.value = item && item.qty !== undefined ? item.qty : '';
+    if (descInput) descInput.value = item && (item.description !== undefined || item.desc !== undefined) ? (item.description || item.desc) : '';
+    if (qtyInput) qtyInput.value = item && (item.quantity !== undefined || item.qty !== undefined) ? (item.quantity || item.qty) : '';
+    if (rateInput) rateInput.value = item && item.rate !== undefined ? item.rate : '';
+  }
+
+  // Enable active edit mode
+  activeEditingBillId = bill.id;
+  if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'flex';
+  if (elements.editingBillLabel) elements.editingBillLabel.textContent = `Bill #${bill.billNo || '---'}`;
+
+  calculateAndSync();
+  switchTab('editor');
+  showToast(`Loaded Bill #${bill.billNo || ''} for editing.`, 'success');
+}
+
+/**
+ * Load selected Firestore bill directly into Preview mode
+ * @param {string} id
+ */
+function viewHistoryBill(id) {
+  const bill = firestoreBills.find(b => b.id === id);
+  if (!bill) {
+    showToast('Bill not found.', 'danger');
+    return;
+  }
+
+  // Populate preview DOM
+  if (elements.billNoInput) elements.billNoInput.value = bill.billNo || '';
+  if (elements.challanNoInput) elements.challanNoInput.value = bill.partyChallanNo || bill.challanNo || '';
+  if (elements.billDateInput) elements.billDateInput.value = bill.billDate || getTodayDateString();
+  if (elements.partyNameInput) elements.partyNameInput.value = bill.partyName || '';
+
+  const items = Array.isArray(bill.items) ? bill.items : [];
+  for (let i = 1; i <= TOTAL_ROWS; i++) {
+    const descInput = document.getElementById(`item-desc-${i}`);
+    const qtyInput = document.getElementById(`item-qty-${i}`);
+    const rateInput = document.getElementById(`item-rate-${i}`);
+
+    const item = items[i - 1];
+    if (descInput) descInput.value = item && (item.description !== undefined || item.desc !== undefined) ? (item.description || item.desc) : '';
+    if (qtyInput) qtyInput.value = item && (item.quantity !== undefined || item.qty !== undefined) ? (item.quantity || item.qty) : '';
     if (rateInput) rateInput.value = item && item.rate !== undefined ? item.rate : '';
   }
 
   calculateAndSync();
-}
-
-/**
- * View saved bill in Bill Preview tab
- * @param {string} id
- */
-function viewHistoryBill(id) {
-  const list = getHistoryList();
-  const bill = list.find(b => b.id === id);
-  if (!bill) {
-    showToast('Bill not found in history.', 'danger');
-    return;
-  }
-
-  populateBillData(bill);
   switchTab('preview');
-  showToast(`Loaded Bill #${bill.billNo} for preview.`, 'success');
+  showToast(`Viewing Bill #${bill.billNo || ''}`, 'success');
 }
 
 /**
- * Load saved bill into editor form for editing or reuse
- * @param {string} id
- */
-function editHistoryBill(id) {
-  const list = getHistoryList();
-  const bill = list.find(b => b.id === id);
-  if (!bill) {
-    showToast('Bill not found in history.', 'danger');
-    return;
-  }
-
-  populateBillData(bill);
-  switchTab('editor');
-
-  if (elements.billNoInput) {
-    elements.billNoInput.focus();
-  }
-
-  showToast(`Loaded Bill #${bill.billNo} for editing.`, 'success');
-}
-
-/**
- * Delete a specific bill from history
+ * Open delete confirmation modal for a specific bill
  * @param {string} id
  */
 function deleteHistoryBill(id) {
-  const list = getHistoryList();
-  const bill = list.find(b => b.id === id);
+  const bill = firestoreBills.find(b => b.id === id);
   if (!bill) return;
 
-  const confirmed = window.confirm(`Are you sure you want to delete Bill #${bill.billNo} from history?`);
-  if (!confirmed) return;
+  billIdToDelete = id;
+  if (elements.deleteBillInfo) {
+    const challanInfo = bill.partyChallanNo || bill.challanNo ? ` | Challan: ${bill.partyChallanNo || bill.challanNo}` : '';
+    elements.deleteBillInfo.textContent = `Bill No: ${bill.billNo || '---'}${challanInfo} | Party: ${bill.partyName || 'General / Cash'} | Total: ${formatCurrency(bill.grandTotal || 0)}`;
+  }
 
-  const updatedList = list.filter(b => b.id !== id);
-  saveHistoryList(updatedList);
-  renderHistoryCards();
-  showToast(`Bill #${bill.billNo} deleted.`, 'danger');
+  if (elements.deleteModal) {
+    elements.deleteModal.style.display = 'flex';
+  }
+}
+
+/**
+ * Close delete modal
+ */
+function closeDeleteModal() {
+  billIdToDelete = null;
+  if (elements.deleteModal) elements.deleteModal.style.display = 'none';
+}
+
+/**
+ * Confirm and delete bill from Firestore Cloud
+ */
+async function confirmDeleteBill() {
+  if (!billIdToDelete || isCloudDeleting) return;
+
+  if (!currentUser || !firestoreDb) {
+    showToast('You must be logged in to delete bills from Firestore.', 'danger');
+    closeDeleteModal();
+    return;
+  }
+
+  isCloudDeleting = true;
+  if (elements.btnConfirmDelete) elements.btnConfirmDelete.disabled = true;
+
+  showToast('Deleting Bill...', 'success');
+
+  try {
+    await firestoreDb
+      .collection('users')
+      .doc(currentUser.uid)
+      .collection('bills')
+      .doc(billIdToDelete)
+      .delete();
+
+    if (activeEditingBillId === billIdToDelete) {
+      cancelEditMode(false);
+    }
+
+    showToast('Bill deleted successfully.', 'danger');
+    closeDeleteModal();
+  } catch (err) {
+    console.error('Error deleting bill from Firestore:', err);
+    showToast('Failed to delete bill from cloud. Please try again.', 'danger');
+  } finally {
+    isCloudDeleting = false;
+    if (elements.btnConfirmDelete) elements.btnConfirmDelete.disabled = false;
+  }
 }
 
 /**
  * Clear all history after user confirmation
  */
-function handleClearAllHistory() {
-  const list = getHistoryList();
-  if (list.length === 0) {
+async function handleClearAllHistory() {
+  if (!currentUser || !firestoreDb) {
+    showToast('Please log in with Firebase first.', 'danger');
+    return;
+  }
+
+  if (firestoreBills.length === 0) {
     showToast('History is already empty.', 'danger');
     return;
   }
 
-  const confirmed = window.confirm('Are you sure you want to delete ALL saved bills history? This cannot be undone.');
+  const confirmed = window.confirm('Are you sure you want to delete ALL saved bills from your Firestore cloud database? This cannot be undone.');
   if (!confirmed) return;
 
-  try {
-    localStorage.removeItem(STORAGE_KEY_HISTORY);
-  } catch (err) {
-    console.error('Error clearing history:', err);
-  }
+  showToast('Deleting all bills from cloud...', 'success');
 
-  updateHistoryBadge();
-  renderHistoryCards();
-  showToast('All saved bill history has been cleared.', 'danger');
+  try {
+    const batch = firestoreDb.batch();
+    firestoreBills.forEach(b => {
+      const docRef = firestoreDb
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('bills')
+        .doc(b.id);
+      batch.delete(docRef);
+    });
+
+    await batch.commit();
+    cancelEditMode(false);
+    showToast('All saved bill history has been cleared.', 'danger');
+  } catch (err) {
+    console.error('Error clearing cloud history:', err);
+    showToast('Failed to clear cloud history. Please try again.', 'danger');
+  }
+}
+
+/**
+ * Manually refresh history from Firestore Cloud
+ */
+function refreshHistoryFromCloud() {
+  if (!currentUser) {
+    openAuthModal();
+    return;
+  }
+  showToast('Syncing with Firestore Cloud...', 'success');
+  subscribeToFirestoreBills();
 }
 
 /**
@@ -1191,6 +1476,325 @@ function clearHistorySearch() {
   renderHistoryCards();
 }
 
+/* ==========================================================================
+   LOCALSTORAGE TO CLOUD MIGRATION FEATURE
+   ========================================================================== */
+
+/**
+ * Check if device contains legacy localStorage history and prompt user
+ */
+function checkLocalHistoryForMigration() {
+  if (!currentUser) return;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LEGACY_HISTORY);
+    if (!raw) {
+      if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
+      return;
+    }
+
+    const legacyList = JSON.parse(raw);
+    if (Array.isArray(legacyList) && legacyList.length > 0) {
+      if (elements.migrationBanner) elements.migrationBanner.style.display = 'block';
+      if (elements.localBillsCount) elements.localBillsCount.textContent = legacyList.length;
+      if (elements.modalLocalBillsCount) elements.modalLocalBillsCount.textContent = legacyList.length;
+    } else {
+      if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
+    }
+  } catch (e) {
+    if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
+  }
+}
+
+/**
+ * Open migration confirmation modal
+ */
+function promptMigrateLocalHistory() {
+  if (!currentUser) {
+    openAuthModal();
+    return;
+  }
+  if (elements.migrateModal) elements.migrateModal.style.display = 'flex';
+  if (elements.migrateStatusBox) elements.migrateStatusBox.style.display = 'none';
+}
+
+/**
+ * Close migration modal
+ */
+function closeMigrateModal() {
+  if (elements.migrateModal) elements.migrateModal.style.display = 'none';
+}
+
+/**
+ * Upload legacy localStorage bills to Firestore without creating duplicates
+ */
+async function executeLocalMigration() {
+  if (isCloudMigrating || !currentUser || !firestoreDb) return;
+
+  let legacyList = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LEGACY_HISTORY);
+    legacyList = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    legacyList = [];
+  }
+
+  if (legacyList.length === 0) {
+    showToast('No local bills found to migrate.', 'danger');
+    closeMigrateModal();
+    return;
+  }
+
+  isCloudMigrating = true;
+  if (elements.btnConfirmMigrate) {
+    elements.btnConfirmMigrate.disabled = true;
+    elements.btnConfirmMigrate.textContent = 'Migrating...';
+  }
+
+  if (elements.migrateStatusBox) {
+    elements.migrateStatusBox.style.display = 'block';
+    elements.migrateStatusBox.className = 'alert-box alert-warning';
+    elements.migrateStatusBox.textContent = `Uploading ${legacyList.length} bills to Firestore... Please wait.`;
+  }
+
+  let migratedCount = 0;
+  let skippedCount = 0;
+
+  try {
+    const userBillsRef = firestoreDb
+      .collection('users')
+      .doc(currentUser.uid)
+      .collection('bills');
+
+    for (const b of legacyList) {
+      const billNo = (b.billNo || '').trim();
+      if (!billNo) continue;
+
+      // Prevent duplicate migration if bill with matching Bill No already exists
+      const alreadyExists = firestoreBills.some(
+        fb => fb.billNo && fb.billNo.trim().toLowerCase() === billNo.toLowerCase()
+      );
+
+      if (alreadyExists) {
+        skippedCount++;
+        continue;
+      }
+
+      const formattedItems = (b.items || []).map((it, idx) => ({
+        srNo: idx + 1,
+        description: it.desc || it.description || '',
+        quantity: Number(it.qty || it.quantity) || 0,
+        rate: Number(it.rate) || 0,
+        amount: Number(it.amount) || 0
+      }));
+
+      await userBillsRef.add({
+        billNo: billNo,
+        partyChallanNo: b.challanNo || b.partyChallanNo || '',
+        billDate: b.billDate || getTodayDateString(),
+        partyName: b.partyName || '',
+        subtotal: Number(b.subtotal) || 0,
+        grandTotal: Number(b.grandTotal) || 0,
+        items: formattedItems,
+        createdAt: b.createdAt ? new Date(b.createdAt) : firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      migratedCount++;
+    }
+
+    if (elements.migrateStatusBox) {
+      elements.migrateStatusBox.className = 'alert-box';
+      elements.migrateStatusBox.style.backgroundColor = '#ecfdf5';
+      elements.migrateStatusBox.style.color = '#065f46';
+      elements.migrateStatusBox.textContent = `${migratedCount} bills migrated successfully! ${skippedCount > 0 ? `(${skippedCount} skipped as already present).` : ''}`;
+    }
+
+    showToast(`${migratedCount} bills migrated successfully to Cloud.`, 'success');
+
+    // Hide banner
+    if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
+
+    setTimeout(() => {
+      closeMigrateModal();
+    }, 2200);
+
+  } catch (err) {
+    console.error('Migration error:', err);
+    if (elements.migrateStatusBox) {
+      elements.migrateStatusBox.className = 'alert-box';
+      elements.migrateStatusBox.style.backgroundColor = '#fef2f2';
+      elements.migrateStatusBox.style.color = '#991b1b';
+      elements.migrateStatusBox.textContent = 'Migration failed. Please check your internet connection.';
+    }
+    showToast('Migration error. Please try again.', 'danger');
+  } finally {
+    isCloudMigrating = false;
+    if (elements.btnConfirmMigrate) {
+      elements.btnConfirmMigrate.disabled = false;
+      elements.btnConfirmMigrate.textContent = 'Migrate to Cloud';
+    }
+  }
+}
+
+/* ==========================================================================
+   AUTHENTICATION MODAL & ACCOUNT MANAGEMENT
+   ========================================================================== */
+
+/**
+ * Handle clicking on top header cloud status badge
+ */
+function handleCloudStatusClick() {
+  if (currentUser) {
+    openAccountModal();
+  } else {
+    openAuthModal();
+  }
+}
+
+/**
+ * Open authentication modal
+ */
+function openAuthModal() {
+  if (typeof isFirebaseConfigured === 'function' && !isFirebaseConfigured()) {
+    if (elements.authConfigWarning) elements.authConfigWarning.style.display = 'block';
+  } else {
+    if (elements.authConfigWarning) elements.authConfigWarning.style.display = 'none';
+  }
+
+  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
+  if (elements.authModal) elements.authModal.style.display = 'flex';
+}
+
+/**
+ * Close authentication modal
+ */
+function closeAuthModal() {
+  if (elements.authModal) elements.authModal.style.display = 'none';
+}
+
+/**
+ * Open business account modal
+ */
+function openAccountModal() {
+  if (!currentUser) return;
+  if (elements.accountUserEmail) elements.accountUserEmail.textContent = currentUser.email || 'Business Owner';
+  if (elements.accountBillsCount) elements.accountBillsCount.textContent = firestoreBills.length;
+  if (elements.accountModal) elements.accountModal.style.display = 'flex';
+}
+
+/**
+ * Close business account modal
+ */
+function closeAccountModal() {
+  if (elements.accountModal) elements.accountModal.style.display = 'none';
+}
+
+/**
+ * Toggle between Login and Register modes
+ */
+function toggleAuthMode() {
+  if (authMode === 'login') {
+    authMode = 'register';
+    if (elements.authModalTitleText) elements.authModalTitleText.textContent = 'Create Business Account';
+    if (elements.btnAuthSubmitText) elements.btnAuthSubmitText.textContent = 'Register & Connect';
+    if (elements.authTogglePrompt) elements.authTogglePrompt.textContent = 'Already have an account?';
+    if (elements.btnAuthModeToggle) elements.btnAuthModeToggle.textContent = 'Log In Here';
+  } else {
+    authMode = 'login';
+    if (elements.authModalTitleText) elements.authModalTitleText.textContent = 'Cloud Login';
+    if (elements.btnAuthSubmitText) elements.btnAuthSubmitText.textContent = 'Log In';
+    if (elements.authTogglePrompt) elements.authTogglePrompt.textContent = "Don't have an account yet?";
+    if (elements.btnAuthModeToggle) elements.btnAuthModeToggle.textContent = 'Create Business Account';
+  }
+  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
+}
+
+/**
+ * Toggle password visibility
+ */
+function togglePasswordVisibility() {
+  if (!elements.authPassword) return;
+  const isPwd = elements.authPassword.type === 'password';
+  elements.authPassword.type = isPwd ? 'text' : 'password';
+}
+
+/**
+ * Handle Auth Form submission (Login / Register)
+ * @param {Event} e
+ */
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+
+  if (!firebaseAuth) {
+    if (elements.authErrorMsg) {
+      elements.authErrorMsg.textContent = 'Firebase is not initialized. Please configure firebase-config.js.';
+      elements.authErrorMsg.style.display = 'block';
+    }
+    return;
+  }
+
+  const email = elements.authEmail ? elements.authEmail.value.trim() : '';
+  const password = elements.authPassword ? elements.authPassword.value : '';
+
+  if (!email || !password) {
+    if (elements.authErrorMsg) {
+      elements.authErrorMsg.textContent = 'Please enter both email and password.';
+      elements.authErrorMsg.style.display = 'block';
+    }
+    return;
+  }
+
+  if (elements.btnAuthSubmit) elements.btnAuthSubmit.disabled = true;
+  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
+
+  try {
+    if (authMode === 'login') {
+      await firebaseAuth.signInWithEmailAndPassword(email, password);
+      showToast('Logged in successfully.', 'success');
+    } else {
+      await firebaseAuth.createUserWithEmailAndPassword(email, password);
+      showToast('Account created & logged in.', 'success');
+    }
+    closeAuthModal();
+  } catch (err) {
+    console.error('Firebase Auth error:', err);
+    let msg = 'Authentication failed. Please check your credentials.';
+    if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      msg = 'Invalid email or password.';
+    } else if (err.code === 'auth/email-already-in-use') {
+      msg = 'This email is already registered. Please log in.';
+    } else if (err.code === 'auth/weak-password') {
+      msg = 'Password is too weak. Please use at least 6 characters.';
+    } else if (err.code === 'auth/network-request-failed') {
+      msg = 'Network error. Please check your internet connection.';
+    } else if (err.message) {
+      msg = err.message;
+    }
+    if (elements.authErrorMsg) {
+      elements.authErrorMsg.textContent = msg;
+      elements.authErrorMsg.style.display = 'block';
+    }
+  } finally {
+    if (elements.btnAuthSubmit) elements.btnAuthSubmit.disabled = false;
+  }
+}
+
+/**
+ * Handle user logout
+ */
+async function handleLogout() {
+  if (!firebaseAuth) return;
+  try {
+    await firebaseAuth.signOut();
+    closeAccountModal();
+    showToast('Logged out successfully.', 'success');
+  } catch (err) {
+    console.error('Logout error:', err);
+    showToast('Logout error.', 'danger');
+  }
+}
+
 /**
  * Sanitize HTML entities to prevent XSS in inputs
  * @param {string} str 
@@ -1198,7 +1802,7 @@ function clearHistorySearch() {
  */
 function escapeHtml(str) {
   if (!str) return '';
-  return str
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -1246,7 +1850,7 @@ function setupEventListeners() {
   attachItemEventListeners();
 }
 
-// Expose functions globally for onclick attributes and external callers
+// Expose functions globally for inline HTML onclick attributes
 window.generateBill = generateBill;
 window.saveAsPDF = saveAsPDF;
 window.printBill = printBill;
@@ -1256,24 +1860,40 @@ window.handleClear = handleClear;
 window.viewHistoryBill = viewHistoryBill;
 window.editHistoryBill = editHistoryBill;
 window.deleteHistoryBill = deleteHistoryBill;
+window.closeDeleteModal = closeDeleteModal;
+window.confirmDeleteBill = confirmDeleteBill;
 window.handleClearAllHistory = handleClearAllHistory;
 window.clearHistorySearch = clearHistorySearch;
 window.togglePartyGroup = togglePartyGroup;
 window.expandAllPartyGroups = expandAllPartyGroups;
 window.collapseAllPartyGroups = collapseAllPartyGroups;
+window.openAuthModal = openAuthModal;
+window.closeAuthModal = closeAuthModal;
+window.toggleAuthMode = toggleAuthMode;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.handleAuthSubmit = handleAuthSubmit;
+window.openAccountModal = openAccountModal;
+window.closeAccountModal = closeAccountModal;
+window.handleCloudStatusClick = handleCloudStatusClick;
+window.handleLogout = handleLogout;
+window.cancelEditMode = cancelEditMode;
+window.promptMigrateLocalHistory = promptMigrateLocalHistory;
+window.closeMigrateModal = closeMigrateModal;
+window.executeLocalMigration = executeLocalMigration;
+window.refreshHistoryFromCloud = refreshHistoryFromCloud;
 
 /**
  * Initialize Application on DOM Ready
  */
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Attach all event listeners to static HTML elements
+  // 1. Attach static DOM event listeners
   setupEventListeners();
 
   // 2. Load draft from localStorage or calculate initial state
   loadDraftFromStorage();
 
-  // 3. Update history count badge
-  updateHistoryBadge();
+  // 3. Initialize Firebase Auth and Cloud Firestore
+  initFirebaseSystem();
 
   // 4. Default view: Show requested hash or Form (1. ENTER BILL)
   const initialHash = window.location.hash.replace('#', '');

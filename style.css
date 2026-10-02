@@ -75,10 +75,12 @@ body {
 .header-container {
   max-width: 900px;
   margin: 0 auto;
-  padding: 12px 16px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .brand-info {
@@ -2004,4 +2006,383 @@ body {
   color: #ffffff !important;
   font-size: 14.5px !important;
   font-weight: 800 !important;
+}
+
+/* ==========================================================================
+   FIREBASE CLOUD INTEGRATION & AUTHENTICATION STYLES
+   ========================================================================== */
+
+/* Cloud Status Header Indicator */
+.header-cloud-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cloud-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background-color: #f3f4f6;
+  color: var(--mid-text);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.cloud-status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.cloud-status-badge .status-dot {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.cloud-status-badge.status-connected {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+.cloud-status-badge.status-connected .status-dot {
+  color: #10b981;
+}
+
+.cloud-status-badge.status-problem {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+.cloud-status-badge.status-problem .status-dot {
+  color: #ef4444;
+}
+
+.cloud-status-badge.status-disconnected,
+.cloud-status-badge.status-checking {
+  background-color: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+.cloud-status-badge.status-disconnected .status-dot,
+.cloud-status-badge.status-checking .status-dot {
+  color: #f59e0b;
+}
+
+.cloud-status-badge.status-config {
+  background-color: #f5f3ff;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+.cloud-status-badge.status-config .status-dot {
+  color: #8b5cf6;
+}
+
+/* Edit Mode Active Banner */
+.edit-mode-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fffbeb !important;
+  border-left: 4px solid #f59e0b !important;
+  padding: 12px 16px !important;
+  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+}
+
+.edit-alert-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-alert-icon {
+  font-size: 20px;
+}
+
+.edit-alert-text strong {
+  color: #b45309;
+  font-size: 13.5px;
+}
+
+/* LocalStorage to Cloud Migration Banner */
+.migration-banner {
+  background: #f0fdf4 !important;
+  border-left: 4px solid #10b981 !important;
+  padding: 14px 16px !important;
+  margin-bottom: 14px;
+}
+
+.migration-banner-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.migration-icon {
+  font-size: 24px;
+}
+
+.migration-info {
+  flex: 1;
+  min-width: 200px;
+}
+
+.migration-title {
+  color: #065f46;
+  font-size: 13.5px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.migration-desc {
+  font-size: 12px;
+  color: #047857;
+  margin: 0;
+}
+
+/* History Cloud Tag & Actions */
+.history-cloud-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #047857;
+  background-color: #d1fae5;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  margin-top: 4px;
+}
+
+.history-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Modal Overlay & Base Card */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(17, 24, 39, 0.65);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  animation: slideInModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInModal {
+  from { transform: translateY(16px) scale(0.97); }
+  to { transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1.5px solid #f3f4f6;
+}
+
+.modal-title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-red);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--light-text);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  background: #f3f4f6;
+  color: var(--dark-text);
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1.5px solid #f3f4f6;
+  background-color: #fafbfc;
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+/* Auth Modal Specifics */
+.auth-desc {
+  font-size: 12.5px;
+  color: var(--mid-text);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper .form-input {
+  padding-right: 42px;
+}
+
+.btn-toggle-pwd {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--light-text);
+  padding: 4px;
+}
+
+.auth-error-msg {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
+.auth-actions-stack {
+  margin-top: 18px;
+}
+
+.auth-footer-toggle {
+  text-align: center;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #f3f4f6;
+  font-size: 12px;
+  color: var(--mid-text);
+}
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--primary-red);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 4px;
+  text-decoration: underline;
+}
+
+.btn-link:hover {
+  color: var(--primary-red-hover);
+}
+
+/* Account Info Card */
+.account-info-box {
+  background-color: #f9fafb;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.account-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  padding: 4px 0;
+}
+
+.account-info-lbl {
+  color: var(--light-text);
+  font-weight: 600;
+}
+
+.account-info-val {
+  font-weight: 700;
+  color: var(--dark-text);
+  word-break: break-all;
+}
+
+/* History Loading & Auth Required States */
+.history-loading-state,
+.history-auth-card {
+  text-align: center;
+  padding: 36px 20px !important;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3.5px solid #e5e7eb;
+  border-top-color: var(--primary-red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 14px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.alert-box {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.alert-warning {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
 }

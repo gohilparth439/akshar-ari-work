@@ -1,36 +1,44 @@
-# AKSHAR ARI WORK - Bill History System
+# AKSHAR ARI WORK - Cloud Bill History System
 
-This directory (`history/`) contains the standalone archive viewer and documentation for the client-side Bill History feature of the **AKSHAR ARI WORK** Bill Generator.
+This directory (`history/`) contains the standalone archive viewer and documentation for the **Firebase Firestore Cloud Bill History** system of the **AKSHAR ARI WORK** Bill Generator.
 
 ---
 
-## 📌 Architecture & Data Storage
+## 📌 Architecture & Cloud Storage
 
-- **Storage Key**: `akshar_bills_history` in browser `localStorage`.
-- **Zero Backend / Server Requirements**: 100% client-side operation compatible with GitHub Pages, local file execution, and Android Chrome.
-- **In-Place Duplicate Prevention**: Bills are indexed and deduplicated by case-insensitive `billNo`. Re-generating or editing an existing bill updates the stored record in place and updates its timestamp.
+- **Database**: Google Firebase Firestore (Cloud Database).
+- **Authentication**: Firebase Authentication (Email + Password).
+- **Primary Source of Truth**: Cloud Firestore (`users/{userId}/bills/{billId}`).
+- **Cross-Device Sync**: Shared in real-time across Computer, Mobile (Android Chrome, iOS Safari), and future Android APKs (via Capacitor).
+- **Zero Backend / Server Requirements**: 100% client-side operation compatible with GitHub Pages, Capacitor APK, and local execution.
+- **In-Place Duplicate Prevention**: Bills are updated in-place by document ID or `billNo` matching so no duplicate records are created.
 - **Party-Name-Wise Grouping**: Bills are organized and grouped automatically by `partyName`. If a bill was generated without a party name, it is grouped cleanly under `"General / Cash"`.
 
 ---
 
-## 🗂 Data Schema
+## 🗂 Firestore Document Schema (`users/{userId}/bills/{billId}`)
 
 Each bill record contains:
 ```json
 {
-  "id": "bill_1695712345678_abcde",
   "billNo": "001",
-  "challanNo": "PC-25",
-  "billDate": "2026-09-26",
+  "partyChallanNo": "PC-25",
+  "billDate": "2026-10-02",
   "partyName": "Ganesha",
-  "items": [
-    { "desc": "Saree Embroidery", "qty": "100", "rate": "50", "amount": 5000 },
-    ...
-  ],
   "subtotal": 5000,
   "grandTotal": 5000,
-  "createdAt": "2026-09-26T06:00:00.000Z",
-  "updatedAt": "2026-09-26T06:05:00.000Z"
+  "items": [
+    {
+      "srNo": 1,
+      "description": "Saree Embroidery",
+      "quantity": 100,
+      "rate": 50,
+      "amount": 5000
+    },
+    ...
+  ],
+  "createdAt": "Firebase Server Timestamp",
+  "updatedAt": "Firebase Server Timestamp"
 }
 ```
 
@@ -39,25 +47,24 @@ Each bill record contains:
 ## 🚀 Key Features
 
 1. **Party-Name-Wise History Organization**:
-   - Instead of a flat list, bills are automatically grouped by **Party Name**.
+   - Automatically grouped by **Party Name**.
    - Each party group header displays:
      - **Party Name** (e.g. `PARTY: Ganesha`, `PARTY: ABC Traders`).
-     - **Total number of bills** for that party (e.g. `2 Bills`).
-     - **Total cumulative billing amount** for that party (e.g. `Total: ₹ 12,500.00`).
+     - **Total number of bills** for that party (e.g. `3 Bills`).
+     - **Total cumulative billing amount** for that party (e.g. `Total: ₹ 18,500.00`).
 2. **Interactive Expand / Collapse (Accordion)**:
    - Tap any Party header to expand or collapse its bills.
    - Quick action controls: **`[ Expand All ]`** and **`[ Collapse All ]`**.
-   - Smooth animated chevron indicator showing the open/closed state.
+   - Animated chevron indicator showing the open/closed state.
 3. **Sorted Newest First**:
    - Within each party group, bills are sorted with the newest bill date/time at the top.
    - Party groups with recent billing activity appear first.
-4. **"Search Party Name" Filtering**:
-   - Dynamic search box filtering by Party Name.
-   - Also supports matching Bill No. or Challan No.
-   - Auto-expands matching party groups so bills are visible immediately.
+4. **"Search Party Name / Bill No. / Party Challan No."**:
+   - Dynamic search box filtering in real time across Party Name, Bill No, and Challan No.
+   - Auto-expands matching party groups so matching bills are visible immediately.
 5. **Card Actions**:
-   - **View / Open in App**: Loads the bill into preview mode with full totals and motto.
-   - **Edit / Reuse**: Loads bill details into the 10-row editor form to modify or reuse as a template.
-   - **Delete**: Safely removes individual bills after prompt confirmation.
-6. **Clear All History**: Allows clearing entire history with safety confirmation.
-7. **Standalone Archive (`history/index.html`)**: Can be opened independently or navigated to from the main application.
+   - **View**: Loads the bill into preview mode with full totals and devotional motto.
+   - **Edit**: Loads bill details into the 10-row editor form to update in Firestore without duplicate creation.
+   - **Delete**: Prompts with confirmation and safely deletes document from Firestore Cloud.
+6. **Local History Migration**:
+   - One-click migration of any legacy `localStorage` bills to Firestore Cloud.
