@@ -1,1905 +1,1628 @@
-/**
- * AKSHAR ARI WORK - Mobile-First Bill Generator with Firebase Firestore Cloud Storage
- * ===================================================================================
- * Features:
- * - 10-item editable card layout (mobile) and table layout (desktop)
- * - Real-time calculation: Amount = Quantity × Rate
- * - Automatic Subtotal & Grand Total (Grand Total = Subtotal, NO discount)
- * - Manual Bill Number entry & Optional Manual Party Challan No. entry
- * - Automatic today's date & Party Name entry
- * - Clean tab switching: [1. ENTER BILL] / [2. BILL PREVIEW] / [3. BILL HISTORY]
- * - Devotional Motto: "॥ Jay Swaminarayan ॥" at top of preview & PDF
- * - Direct Save-as-PDF (jsPDF + html2canvas) without print dialog
- * - Native Print Bill (window.print())
- * - Firebase Authentication (Email + Password for business owner)
- * - Firebase Firestore Cloud Database (Primary source of truth for cross-device shared history)
- * - User Data Isolation: users/{userId}/bills/{billId}
- * - Party-name-wise grouped history with count & total billing badges
- * - Instant search across Party Name, Bill No, and Party Challan No
- * - Accordion expand / collapse for party groups
- * - Safe migration of legacy localStorage history to Firestore Cloud
- */
+/* ============================================================
+   AKSHAR ARI WORK — Bill Generator V2  —  Master Script
+   ============================================================ */
+let appInitialized = false;
+function initApp() {
+    if (appInitialized) return;
+    appInitialized = true;
 
-// Configuration Constants
-const TOTAL_ROWS = 10;
-const STORAGE_KEY_CURRENT_BILL = 'akshar_current_bill_draft';
-const STORAGE_KEY_LEGACY_HISTORY = 'akshar_bills_history';
+    // ========== DOM REFERENCES ==========
+    const $ = id => document.getElementById(id);
 
-// DOM Element References
-const elements = {
-  // Inputs
-  billNoInput: document.getElementById('input-bill-no'),
-  challanNoInput: document.getElementById('input-challan-no'),
-  billDateInput: document.getElementById('input-bill-date'),
-  partyNameInput: document.getElementById('input-party-name'),
+    // Inputs
+    const inpBillNo       = $('inp-billNo');
+    const inpChallan      = $('inp-challan');
+    const inpDate         = $('inp-date');
+    const inpPartyName    = $('inp-partyName');
+    const inpPartyDetails = $('inp-partyDetails');
+    const inpSubtotal     = $('inp-subtotal');
+    const inpDiscount     = $('inp-discount');
+    const inpDiscountAmount = $('inp-discountAmount');
+    const inpGrandTotal   = $('inp-grandTotal');
+    const chkPayment      = $('chk-payment');
+    const paymentFields   = $('paymentFields');
+    const inpAmtReceived  = $('inp-amountReceived');
+    const inpPayDate      = $('inp-paymentDate');
 
-  // Calculation Display in Form
-  calcSubtotal: document.getElementById('calc-subtotal'),
-  calcGrandTotal: document.getElementById('calc-grandtotal'),
+    // Tables
+    const editTableBody   = $('editTableBody');
+    const prevTableBody   = $('prevTableBody');
 
-  // Navigation Tabs & Panels
-  tabEditor: document.getElementById('tab-editor'),
-  tabPreview: document.getElementById('tab-preview'),
-  tabHistory: document.getElementById('tab-history'),
-  panelEditor: document.getElementById('panel-editor'),
-  panelPreview: document.getElementById('panel-preview'),
-  panelHistory: document.getElementById('panel-history'),
-  historyBadge: document.getElementById('history-badge'),
+    // Preview spans
+    const prevBillNo      = $('prev-billNo');
+    const prevChallan     = $('prev-challan');
+    const prevDate        = $('prev-date');
+    const prevPartyName   = $('prev-partyName');
+    const prevPartyDetails= $('prev-partyDetails');
+    const prevPartyDetailsRow = $('prev-partyDetailsRow');
+    const prevSubtotal    = $('prev-subtotal');
+    const prevDiscount    = $('prev-discount');
+    const prevDiscountRow = $('prev-discountRow');
+    const prevDiscountLabel = $('prev-discountLabel');
+    const prevGrandTotal  = $('prev-grandTotal');
 
-  // Cloud Status in Header
-  cloudStatusBtn: document.getElementById('cloud-status-btn'),
-  cloudStatusText: document.getElementById('cloud-status-text'),
+    // Buttons
+    const btnAddRow    = $('btn-addRow');
+    const btnDeleteRow = $('btn-deleteRow');
+    const btnSave      = $('btn-save');
+    const btnPrint     = $('btn-print');
+    const btnPdf       = $('btn-pdf');
+    const btnReset     = $('btn-reset');
+    const statusMsg    = $('statusMsg');
 
-  // Edit Mode Active Banner
-  editingModeBanner: document.getElementById('editing-mode-banner'),
-  editingBillLabel: document.getElementById('editing-bill-label'),
+    // Storage
+    const STORAGE_KEY = 'akshar_ari_bills_v2';
+    let editingBillId = null; // tracks if we are editing an existing bill
 
-  // History Controls
-  historySearchCard: document.getElementById('history-search-card'),
-  historySearchInput: document.getElementById('history-search-input'),
-  btnClearSearch: document.getElementById('btn-clear-search'),
-  historyCountText: document.getElementById('history-count-text'),
-  historyCardsContainer: document.getElementById('history-cards-container'),
-  btnClearHistory: document.getElementById('btn-clear-history'),
-  btnRefreshHistory: document.getElementById('btn-refresh-history'),
-  historyAuthRequired: document.getElementById('history-auth-required'),
-
-  // Migration Elements
-  migrationBanner: document.getElementById('migration-banner'),
-  localBillsCount: document.getElementById('local-bills-count'),
-  migrateModal: document.getElementById('migrate-modal'),
-  modalLocalBillsCount: document.getElementById('modal-local-bills-count'),
-  migrateStatusBox: document.getElementById('migrate-status-box'),
-  btnConfirmMigrate: document.getElementById('btn-confirm-migrate'),
-
-  // Action Buttons
-  btnNewBill: document.getElementById('btn-new-bill'),
-  btnClear: document.getElementById('btn-clear'),
-  btnGenerate: document.getElementById('btn-generate'),
-  btnPrint: document.getElementById('btn-print'),
-  btnPdf: document.getElementById('btn-pdf'),
-
-  // Preview Header Buttons
-  btnBackToEdit: document.getElementById('btn-back-to-edit'),
-  btnPreviewPrint: document.getElementById('btn-preview-print'),
-  btnPreviewPdf: document.getElementById('btn-preview-pdf'),
-
-  // Preview Elements
-  viewBillNo: document.getElementById('view-bill-no'),
-  viewChallanNo: document.getElementById('view-challan-no'),
-  viewChallanItem: document.getElementById('view-challan-item'),
-  viewBillDate: document.getElementById('view-bill-date'),
-  viewPartyName: document.getElementById('view-party-name'),
-  viewSubtotal: document.getElementById('view-subtotal'),
-  viewGrandTotal: document.getElementById('view-grandtotal'),
-
-  // Modals
-  authModal: document.getElementById('auth-modal'),
-  authModalTitleText: document.getElementById('auth-modal-title-text'),
-  authModalDesc: document.getElementById('auth-modal-desc'),
-  authConfigWarning: document.getElementById('auth-config-warning'),
-  authForm: document.getElementById('auth-form'),
-  authEmail: document.getElementById('auth-email'),
-  authPassword: document.getElementById('auth-password'),
-  authErrorMsg: document.getElementById('auth-error-msg'),
-  btnAuthSubmit: document.getElementById('btn-auth-submit'),
-  btnAuthSubmitText: document.getElementById('btn-auth-submit-text'),
-  authTogglePrompt: document.getElementById('auth-toggle-prompt'),
-  btnAuthModeToggle: document.getElementById('btn-auth-mode-toggle'),
-
-  accountModal: document.getElementById('account-modal'),
-  accountUserEmail: document.getElementById('account-user-email'),
-  accountCloudStatus: document.getElementById('account-cloud-status'),
-  accountBillsCount: document.getElementById('account-bills-count'),
-
-  deleteModal: document.getElementById('delete-modal'),
-  deleteBillInfo: document.getElementById('delete-bill-info'),
-  btnConfirmDelete: document.getElementById('btn-confirm-delete'),
-
-  // Toast
-  toast: document.getElementById('toast'),
-};
-
-// Application State Variables
-let currentUser = null;
-let activeEditingBillId = null;
-let firestoreBills = [];
-let isCloudSaving = false;
-let isCloudDeleting = false;
-let isCloudMigrating = false;
-let billIdToDelete = null;
-let authMode = 'login'; // 'login' | 'register'
-let unsubscribeBillsListener = null;
-const collapsedPartyKeys = new Set();
-
-/**
- * Format a number into Indian Rupee Currency display (e.g. ₹ 72,000.00)
- * @param {number} value
- * @returns {string}
- */
-function formatCurrency(value) {
-  const num = isNaN(value) || value < 0 ? 0 : Number(value);
-  return '₹ ' + num.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
-/**
- * Format date string (YYYY-MM-DD) into readable display format (DD/MM/YYYY)
- * @param {string} dateString 
- * @returns {string}
- */
-function formatDateDisplay(dateString) {
-  if (!dateString) return '--/--/----';
-  const parts = dateString.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateString;
-}
-
-/**
- * Get today's date formatted as YYYY-MM-DD for standard HTML date input
- * @returns {string}
- */
-function getTodayDateString() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Display a temporary toast notification to the user
- * @param {string} message 
- * @param {string} type - 'success' or 'danger'
- */
-let toastTimeout;
-function showToast(message, type = 'success') {
-  if (!elements.toast) return;
-  clearTimeout(toastTimeout);
-  
-  elements.toast.textContent = message;
-  elements.toast.className = `toast show ${type === 'danger' ? 'toast-danger' : 'toast-success'}`;
-  
-  toastTimeout = setTimeout(() => {
-    elements.toast.className = 'toast';
-  }, 3200);
-}
-
-/**
- * Switch between "1. ENTER BILL", "2. BILL PREVIEW", and "3. BILL HISTORY" tabs
- * @param {'editor' | 'preview' | 'history'} target 
- */
-function switchTab(target) {
-  if (elements.panelEditor) elements.panelEditor.style.display = 'none';
-  if (elements.panelPreview) elements.panelPreview.style.display = 'none';
-  if (elements.panelHistory) elements.panelHistory.style.display = 'none';
-
-  if (elements.tabEditor) elements.tabEditor.classList.remove('active');
-  if (elements.tabPreview) elements.tabPreview.classList.remove('active');
-  if (elements.tabHistory) elements.tabHistory.classList.remove('active');
-
-  if (target === 'preview') {
-    if (elements.panelPreview) elements.panelPreview.style.display = 'block';
-    if (elements.tabPreview) elements.tabPreview.classList.add('active');
-  } else if (target === 'history') {
-    if (elements.panelHistory) elements.panelHistory.style.display = 'block';
-    if (elements.tabHistory) elements.tabHistory.classList.add('active');
-    
-    // Check if user is logged in
-    if (!currentUser) {
-      if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'block';
-      if (elements.historySearchCard) elements.historySearchCard.style.display = 'none';
-      if (elements.historyCardsContainer) elements.historyCardsContainer.innerHTML = '';
-    } else {
-      if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'none';
-      if (elements.historySearchCard) elements.historySearchCard.style.display = 'block';
-      renderHistoryCards();
-      checkLocalHistoryForMigration();
-    }
-  } else {
-    // Default to editor
-    if (elements.panelEditor) elements.panelEditor.style.display = 'block';
-    if (elements.tabEditor) elements.tabEditor.classList.add('active');
-  }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-/**
- * Update the Cloud Connection Status indicator badge
- * @param {'connected' | 'problem' | 'disconnected' | 'config' | 'checking'} status
- * @param {string} label
- */
-function updateCloudStatus(status, label) {
-  if (!elements.cloudStatusBtn || !elements.cloudStatusText) return;
-  elements.cloudStatusBtn.className = `cloud-status-badge status-${status}`;
-  elements.cloudStatusText.textContent = label;
-
-  if (status === 'connected') {
-    elements.cloudStatusBtn.title = `Connected to Firebase Firestore (${currentUser ? currentUser.email : ''}). Tap to view account.`;
-  } else if (status === 'config') {
-    elements.cloudStatusBtn.title = "Firebase configuration missing. Tap for setup details.";
-  } else if (status === 'problem') {
-    elements.cloudStatusBtn.title = "Cloud Connection Problem. Check internet and Firebase.";
-  } else {
-    elements.cloudStatusBtn.title = "Not connected. Tap to log in with your business account.";
-  }
-}
-
-/**
- * Core Calculation Engine:
- * - Computes row amounts: Amount = Quantity × Rate for all 10 items
- * - Computes Subtotal = Sum of all item amounts
- * - Computes Grand Total = Subtotal (NO discount)
- * - Updates Editor UI and Live A4 Preview UI simultaneously
- * - Automatically saves the draft into localStorage
- */
-function calculateAndSync() {
-  let subtotal = 0;
-
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-    const rowAmountEl = document.getElementById(`item-amount-${i}`);
-
-    const viewDescCell = document.getElementById(`view-desc-${i}`);
-    const viewQtyCell = document.getElementById(`view-qty-${i}`);
-    const viewRateCell = document.getElementById(`view-rate-${i}`);
-    const viewAmountCell = document.getElementById(`view-amount-${i}`);
-
-    const desc = descInput ? descInput.value.trim() : '';
-    const rawQty = qtyInput ? parseFloat(qtyInput.value) : 0;
-    const rawRate = rateInput ? parseFloat(rateInput.value) : 0;
-
-    const qty = isNaN(rawQty) || rawQty < 0 ? 0 : rawQty;
-    const rate = isNaN(rawRate) || rawRate < 0 ? 0 : rawRate;
-
-    // Formula: Amount = Quantity × Rate
-    const rowAmount = qty * rate;
-    subtotal += rowAmount;
-
-    // Update row amount in form card
-    if (rowAmountEl) {
-      rowAmountEl.textContent = formatCurrency(rowAmount);
-    }
-
-    // Update Live Preview Row
-    if (viewDescCell && viewQtyCell && viewRateCell && viewAmountCell) {
-      if (desc !== '' || qty > 0 || rate > 0) {
-        viewDescCell.innerHTML = desc ? `<span class="item-filled-desc">${escapeHtml(desc)}</span>` : '<span class="item-empty-desc">—</span>';
-        viewQtyCell.textContent = qty > 0 ? qty : '—';
-        viewRateCell.textContent = rate > 0 ? rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
-        viewAmountCell.textContent = rowAmount > 0 ? rowAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
-      } else {
-        viewDescCell.innerHTML = '<span class="item-empty-desc">—</span>';
-        viewQtyCell.textContent = '—';
-        viewRateCell.textContent = '—';
-        viewAmountCell.textContent = '—';
-      }
-    }
-  }
-
-  // Grand Total = Subtotal (NO discount)
-  const grandTotal = subtotal;
-
-  // Update Calculation Summary in Form
-  if (elements.calcSubtotal) elements.calcSubtotal.textContent = formatCurrency(subtotal);
-  if (elements.calcGrandTotal) elements.calcGrandTotal.textContent = formatCurrency(grandTotal);
-
-  // Update Calculation Summary in Preview
-  if (elements.viewSubtotal) elements.viewSubtotal.textContent = formatCurrency(subtotal);
-  if (elements.viewGrandTotal) elements.viewGrandTotal.textContent = formatCurrency(grandTotal);
-
-  // Sync Bill Meta & Party Info to Preview
-  syncPartyAndMetaToPreview();
-
-  // Save current form inputs to localStorage as draft so browser refresh never loses typing
-  saveCurrentDraftToStorage();
-}
-
-/**
- * Sync header metadata, Party Challan No, and Party Name from inputs to the Live A4 Preview
- */
-function syncPartyAndMetaToPreview() {
-  // Bill No
-  if (elements.viewBillNo && elements.billNoInput) {
-    const billNoVal = elements.billNoInput.value.trim();
-    elements.viewBillNo.textContent = billNoVal !== '' ? billNoVal : '—';
-  }
-
-  // Party Challan No (Optional: completely hidden if blank so PDF/Preview is never ugly)
-  if (elements.viewChallanItem && elements.viewChallanNo && elements.challanNoInput) {
-    const challanVal = elements.challanNoInput.value.trim();
-    if (challanVal !== '') {
-      elements.viewChallanNo.textContent = challanVal;
-      elements.viewChallanItem.classList.remove('is-hidden');
-      elements.viewChallanItem.style.setProperty('display', 'flex', 'important');
-    } else {
-      elements.viewChallanNo.textContent = '';
-      elements.viewChallanItem.classList.add('is-hidden');
-      elements.viewChallanItem.style.setProperty('display', 'none', 'important');
-    }
-  }
-
-  // Date
-  if (elements.viewBillDate && elements.billDateInput) {
-    const dateVal = elements.billDateInput.value;
-    elements.viewBillDate.textContent = formatDateDisplay(dateVal);
-  }
-
-  // Party Name
-  if (elements.viewPartyName && elements.partyNameInput) {
-    const pName = elements.partyNameInput.value.trim();
-    elements.viewPartyName.textContent = pName !== '' ? pName : '—';
-  }
-}
-
-/**
- * Attach live change listeners on all 10 item inputs
- */
-function attachItemEventListeners() {
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    if (descInput) {
-      descInput.addEventListener('input', calculateAndSync);
-    }
-
-    if (qtyInput) {
-      qtyInput.addEventListener('input', () => {
-        if (parseFloat(qtyInput.value) < 0) {
-          qtyInput.value = '0';
-        }
-        calculateAndSync();
-      });
-    }
-
-    if (rateInput) {
-      rateInput.addEventListener('input', () => {
-        if (parseFloat(rateInput.value) < 0) {
-          rateInput.value = '0';
-        }
-        calculateAndSync();
-      });
-    }
-  }
-}
-
-/**
- * Save current bill draft to localStorage to prevent data loss on page refresh
- */
-function saveCurrentDraftToStorage() {
-  const items = [];
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    items.push({
-      desc: descInput ? descInput.value : '',
-      qty: qtyInput ? qtyInput.value : '',
-      rate: rateInput ? rateInput.value : ''
-    });
-  }
-
-  const draftData = {
-    billNo: elements.billNoInput ? elements.billNoInput.value : '',
-    challanNo: elements.challanNoInput ? elements.challanNoInput.value : '',
-    billDate: elements.billDateInput ? elements.billDateInput.value : '',
-    partyName: elements.partyNameInput ? elements.partyNameInput.value : '',
-    activeEditingBillId: activeEditingBillId,
-    items: items
-  };
-
-  try {
-    localStorage.setItem(STORAGE_KEY_CURRENT_BILL, JSON.stringify(draftData));
-  } catch (e) {
-    console.warn('Unable to save draft to localStorage', e);
-  }
-}
-
-/**
- * Load draft from localStorage on initial page load if present
- */
-function loadDraftFromStorage() {
-  if (elements.billDateInput) {
-    elements.billDateInput.value = getTodayDateString();
-  }
-
-  const savedDraft = localStorage.getItem(STORAGE_KEY_CURRENT_BILL);
-  if (!savedDraft) {
-    calculateAndSync();
-    return;
-  }
-
-  try {
-    const draft = JSON.parse(savedDraft);
-    if (draft) {
-      if (draft.billNo !== undefined && elements.billNoInput) elements.billNoInput.value = draft.billNo;
-      if (draft.challanNo !== undefined && elements.challanNoInput) elements.challanNoInput.value = draft.challanNo;
-      if (draft.billDate && elements.billDateInput) elements.billDateInput.value = draft.billDate;
-      if (elements.partyNameInput) {
-        if (draft.partyName !== undefined) {
-          elements.partyNameInput.value = draft.partyName;
-        } else if (draft.customerName !== undefined) {
-          elements.partyNameInput.value = draft.customerName;
-        }
-      }
-
-      if (draft.activeEditingBillId) {
-        activeEditingBillId = draft.activeEditingBillId;
-        if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'flex';
-        if (elements.editingBillLabel) elements.editingBillLabel.textContent = `Bill #${draft.billNo || '---'}`;
-      }
-
-      if (Array.isArray(draft.items)) {
-        draft.items.forEach((item, index) => {
-          const rowNum = index + 1;
-          if (rowNum <= TOTAL_ROWS) {
-            const descInput = document.getElementById(`item-desc-${rowNum}`);
-            const qtyInput = document.getElementById(`item-qty-${rowNum}`);
-            const rateInput = document.getElementById(`item-rate-${rowNum}`);
-
-            if (descInput && item.desc !== undefined) descInput.value = item.desc;
-            if (qtyInput && item.qty !== undefined) qtyInput.value = item.qty;
-            if (rateInput && item.rate !== undefined) rateInput.value = item.rate;
-          }
+    // ========== NAVIGATION ==========
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', e => {
+            e.preventDefault();
+            const page = link.dataset.page;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            $('page-' + page).classList.add('active');
+            link.classList.add('active');
+            // Refresh data on page switch
+            if (page === 'history') {
+                renderHistory();
+                refreshBillsFromCloud();
+            }
+            if (page === 'pending') renderPending();
+            if (page === 'dashboard') renderDashboard();
         });
-      }
+    });
+
+    // ========== EDIT TABLE — ROW MANAGEMENT ==========
+    function wireRow(tr) {
+        const inDesc = tr.children[1] ? (tr.children[1].querySelector('input') || tr.children[1].firstChild) : null;
+        const inQty  = tr.children[2] ? (tr.children[2].querySelector('input') || tr.children[2].firstChild) : null;
+        const inRate = tr.children[3] ? (tr.children[3].querySelector('input') || tr.children[3].firstChild) : null;
+        const inAmt  = tr.children[4] ? (tr.children[4].querySelector('input') || tr.children[4].firstChild) : null;
+        const btnDel = tr.children[5] ? (tr.children[5].querySelector('button') || tr.children[5].firstChild) : null;
+
+        function calcRow() {
+            const q = parseFloat(inQty ? inQty.value : 0) || 0;
+            const r = parseFloat(inRate ? inRate.value : 0) || 0;
+            if (inAmt) {
+                inAmt.value = (q * r) > 0 ? (q * r).toFixed(2) : '';
+            }
+            recalcAll();
+        }
+
+        if (inQty && !inQty._calcBound) {
+            inQty._calcBound = true;
+            ['input', 'change', 'keyup', 'blur'].forEach(evt => inQty.addEventListener(evt, calcRow));
+        }
+        if (inRate && !inRate._calcBound) {
+            inRate._calcBound = true;
+            ['input', 'change', 'keyup', 'blur'].forEach(evt => inRate.addEventListener(evt, calcRow));
+        }
+        if (inDesc && !inDesc._prevBound) {
+            inDesc._prevBound = true;
+            ['input', 'change', 'keyup', 'blur'].forEach(evt => inDesc.addEventListener(evt, updatePreview));
+        }
+        if (btnDel && !btnDel._delBound) {
+            btnDel._delBound = true;
+            btnDel.addEventListener('click', () => {
+                tr.remove();
+                renumberRows();
+                recalcAll();
+                updatePreview();
+            });
+        }
     }
-  } catch (e) {
-    console.error('Error parsing saved draft from localStorage:', e);
-  }
 
-  calculateAndSync();
-}
+    function createEditRow(data) {
+        data = data || {};
+        const tr = document.createElement('tr');
 
-/* ==========================================================================
-   FIREBASE AUTHENTICATION & CLOUD FIRESTORE LOGIC
-   ========================================================================== */
+        // Sr. No.
+        const tdSr = document.createElement('td');
+        tdSr.className = 'td-sr-num';
+        tdSr.textContent = editTableBody.children.length + 1;
+        tdSr.style.textAlign = 'center';
+        tdSr.style.fontWeight = '600';
+        tdSr.style.color = '#555';
+        tr.appendChild(tdSr);
 
-/**
- * Initialize Firebase Auth and Firestore Cloud Database
- */
-function initFirebaseSystem() {
-  if (typeof isFirebaseConfigured !== 'function' || !isFirebaseConfigured()) {
-    updateCloudStatus('config', '● Cloud Not Configured');
-    if (elements.authConfigWarning) elements.authConfigWarning.style.display = 'block';
-    return;
-  }
+        // Description
+        const tdDesc = document.createElement('td');
+        const inDesc = document.createElement('input');
+        inDesc.type = 'text';
+        inDesc.className = 'inp-item-desc';
+        inDesc.value = data.desc || '';
+        inDesc.placeholder = 'Enter item or work description';
+        inDesc.style.textAlign = 'left';
+        tdDesc.appendChild(inDesc);
+        tr.appendChild(tdDesc);
 
-  try {
-    if (typeof firebase !== 'undefined' && firebase.apps.length > 0) {
-      firebaseAuth = firebase.auth();
-      firestoreDb = firebase.firestore();
+        // Quantity
+        const tdQty = document.createElement('td');
+        const inQty = document.createElement('input');
+        inQty.type = 'number';
+        inQty.inputMode = 'numeric';
+        inQty.className = 'inp-item-qty';
+        inQty.min = '0';
+        inQty.value = data.qty !== undefined && data.qty !== 0 ? data.qty : '';
+        inQty.placeholder = '0';
+        tdQty.appendChild(inQty);
+        tr.appendChild(tdQty);
 
-      // Listen to auth state changes across all browser tabs
-      firebaseAuth.onAuthStateChanged(handleAuthStateChanged);
-    } else {
-      updateCloudStatus('problem', '● Cloud Connection Problem');
+        // Rate
+        const tdRate = document.createElement('td');
+        const inRate = document.createElement('input');
+        inRate.type = 'number';
+        inRate.inputMode = 'decimal';
+        inRate.className = 'inp-item-rate';
+        inRate.min = '0';
+        inRate.step = '0.01';
+        inRate.value = data.rate !== undefined && data.rate !== 0 ? data.rate : '';
+        inRate.placeholder = '0.00';
+        tdRate.appendChild(inRate);
+        tr.appendChild(tdRate);
+
+        // Amount (readonly)
+        const tdAmt = document.createElement('td');
+        const inAmt = document.createElement('input');
+        inAmt.type = 'text';
+        inAmt.readOnly = true;
+        inAmt.className = 'inp-item-amt';
+        inAmt.placeholder = '0.00';
+        inAmt.style.fontWeight = '600';
+        tdAmt.appendChild(inAmt);
+        tr.appendChild(tdAmt);
+
+        // Delete button (hidden in print)
+        const tdDel = document.createElement('td');
+        tdDel.className = 'no-print td-del-cell';
+        const btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.textContent = '✕';
+        btnDel.className = 'btn-del-row';
+        btnDel.title = 'Delete this row';
+        if (btnDel.setAttribute) btnDel.setAttribute('aria-label', 'Delete row');
+        tdDel.appendChild(btnDel);
+        tr.appendChild(tdDel);
+
+        wireRow(tr);
+
+        // Calc if pre-populated
+        if (data.qty && data.rate) {
+            const q = parseFloat(data.qty) || 0;
+            const r = parseFloat(data.rate) || 0;
+            inAmt.value = (q * r) > 0 ? (q * r).toFixed(2) : '';
+        }
+
+        return tr;
     }
-  } catch (err) {
-    console.error("Firebase init error in script:", err);
-    updateCloudStatus('problem', '● Cloud Connection Problem');
-  }
-}
 
-/**
- * Handle Firebase Auth state changes
- * @param {Object|null} user 
- */
-function handleAuthStateChanged(user) {
-  if (user) {
-    currentUser = user;
-    updateCloudStatus('connected', '● Cloud Connected');
-
-    if (elements.accountUserEmail) elements.accountUserEmail.textContent = user.email || 'Business Owner';
-    if (elements.accountCloudStatus) elements.accountCloudStatus.textContent = '● Cloud Connected';
-    if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'none';
-    if (elements.historySearchCard) elements.historySearchCard.style.display = 'block';
-
-    closeAuthModal();
-
-    // Subscribe to real-time Firestore bills under users/{userId}/bills
-    subscribeToFirestoreBills();
-
-    // Check if device has legacy localStorage bills to offer migration
-    checkLocalHistoryForMigration();
-  } else {
-    currentUser = null;
-    if (unsubscribeBillsListener) {
-      unsubscribeBillsListener();
-      unsubscribeBillsListener = null;
+    function renumberRows() {
+        Array.from(editTableBody.children).forEach((tr, i) => {
+            tr.children[0].textContent = i + 1;
+        });
     }
-    firestoreBills = [];
-    updateCloudStatus('disconnected', '● Cloud Not Connected');
 
-    if (elements.historyBadge) elements.historyBadge.textContent = '0';
-    if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
+    function recalcAll() {
+        let subtotal = 0;
+        editTableBody.querySelectorAll('tr').forEach(tr => {
+            const inQty  = tr.children[2] ? (tr.children[2].querySelector('input') || tr.children[2].firstChild) : null;
+            const inRate = tr.children[3] ? (tr.children[3].querySelector('input') || tr.children[3].firstChild) : null;
+            const inAmt  = tr.children[4] ? (tr.children[4].querySelector('input') || tr.children[4].firstChild) : null;
 
-    // If currently on history tab, show login required
-    if (elements.panelHistory && elements.panelHistory.style.display !== 'none') {
-      if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'block';
-      if (elements.historySearchCard) elements.historySearchCard.style.display = 'none';
-      if (elements.historyCardsContainer) elements.historyCardsContainer.innerHTML = '';
+            const q = parseFloat(inQty ? inQty.value : 0) || 0;
+            const r = parseFloat(inRate ? inRate.value : 0) || 0;
+            const rowAmt = q * r;
+
+            if (inAmt) {
+                inAmt.value = rowAmt > 0 ? rowAmt.toFixed(2) : '';
+            }
+            subtotal += rowAmt;
+        });
+        inpSubtotal.value = subtotal.toFixed(2);
+
+        let discountPercent = parseFloat(inpDiscount.value) || 0;
+        if (discountPercent < 0) {
+            discountPercent = 0;
+            inpDiscount.value = 0;
+        } else if (discountPercent > 100) {
+            discountPercent = 100;
+            inpDiscount.value = 100;
+        }
+
+        const discountAmount = (subtotal * discountPercent) / 100;
+        if (inpDiscountAmount) {
+            inpDiscountAmount.value = discountAmount.toFixed(2);
+        }
+
+        const grand = Math.max(0, subtotal - discountAmount);
+        inpGrandTotal.value = grand.toFixed(2);
+
+        // Update preview in real-time
+        updatePreview();
     }
-  }
-}
 
-/**
- * Subscribe to real-time updates from Firestore for the authenticated user
- */
-function subscribeToFirestoreBills() {
-  if (!currentUser || !firestoreDb) return;
+    // Event delegation on table body: catch ANY input, change, keyup, or blur
+    function handleItemInput(e) {
+        const target = e.target;
+        if (!target || target.tagName !== 'INPUT') return;
+        const tr = target.closest ? target.closest('tr') : (target.parentElement ? target.parentElement.parentElement : null);
+        if (!tr) return;
 
-  if (unsubscribeBillsListener) {
-    unsubscribeBillsListener();
-  }
+        const inQty  = tr.children[2] ? (tr.children[2].querySelector('input') || tr.children[2].firstChild) : null;
+        const inRate = tr.children[3] ? (tr.children[3].querySelector('input') || tr.children[3].firstChild) : null;
+        const inAmt  = tr.children[4] ? (tr.children[4].querySelector('input') || tr.children[4].firstChild) : null;
 
-  // Show loading indicator on first subscription
-  if (elements.historyCardsContainer && firestoreBills.length === 0) {
-    elements.historyCardsContainer.innerHTML = `
-      <div class="history-loading-state">
-        <div class="spinner"></div>
-        <h3 class="empty-title">Loading History...</h3>
-        <p class="text-muted">Fetching your cloud bills from Firestore...</p>
-      </div>
-    `;
-  }
+        const q = parseFloat(inQty ? inQty.value : 0) || 0;
+        const r = parseFloat(inRate ? inRate.value : 0) || 0;
+        if (inAmt) {
+            inAmt.value = (q * r) > 0 ? (q * r).toFixed(2) : '';
+        }
 
-  try {
-    const billsCollection = firestoreDb
-      .collection('users')
-      .doc(currentUser.uid)
-      .collection('bills');
+        recalcAll();
+    }
 
-    unsubscribeBillsListener = billsCollection.onSnapshot(
-      (snapshot) => {
-        const loadedBills = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          loadedBills.push({
-            id: doc.id,
-            ...data
-          });
+    if (editTableBody && editTableBody.addEventListener) {
+        ['input', 'change', 'keyup', 'blur'].forEach(evt => {
+            editTableBody.addEventListener(evt, handleItemInput);
         });
 
-        firestoreBills = loadedBills;
-        if (elements.historyBadge) elements.historyBadge.textContent = firestoreBills.length;
-        if (elements.accountBillsCount) elements.accountBillsCount.textContent = firestoreBills.length;
-
-        renderHistoryCards();
-        updateCloudStatus('connected', '● Cloud Connected');
-      },
-      (error) => {
-        console.error("Firestore onSnapshot error:", error);
-        updateCloudStatus('problem', '● Cloud Connection Problem');
-        showToast("Cloud connection error. Please check your internet or Firebase Security Rules.", "danger");
-      }
-    );
-  } catch (err) {
-    console.error("Error setting up Firestore listener:", err);
-    updateCloudStatus('problem', '● Cloud Connection Problem');
-  }
-}
-
-/**
- * Save current bill to Firestore Cloud Database
- * - Performs Firestore upsert under users/{userId}/bills/{billId}
- * - Primary source of truth for history
- * - Does not show success unless Firestore confirms the save
- * @returns {Promise<boolean>}
- */
-async function saveCurrentBillToFirestore() {
-  // If not logged in, prompt login
-  if (!currentUser) {
-    openAuthModal();
-    showToast('Please log in with Firebase to save your bill to Cloud.', 'danger');
-    return false;
-  }
-
-  if (!firestoreDb) {
-    showToast('Cloud database is not initialized. Please verify firebase-config.js.', 'danger');
-    return false;
-  }
-
-  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
-  if (!billNoVal) return false;
-
-  const challanNoVal = elements.challanNoInput ? elements.challanNoInput.value.trim() : '';
-  const dateVal = elements.billDateInput ? elements.billDateInput.value : getTodayDateString();
-  const partyNameVal = elements.partyNameInput ? elements.partyNameInput.value.trim() : '';
-
-  // Extract all 10 item rows
-  const items = [];
-  let subtotal = 0;
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    const desc = descInput ? descInput.value.trim() : '';
-    const rawQty = qtyInput ? parseFloat(qtyInput.value) : 0;
-    const rawRate = rateInput ? parseFloat(rateInput.value) : 0;
-    const qty = isNaN(rawQty) || rawQty < 0 ? 0 : rawQty;
-    const rate = isNaN(rawRate) || rawRate < 0 ? 0 : rawRate;
-    const amount = qty * rate;
-    subtotal += amount;
-
-    items.push({
-      srNo: i,
-      description: desc,
-      quantity: qty,
-      rate: rate,
-      amount: amount
-    });
-  }
-
-  const grandTotal = subtotal;
-  const isEditing = Boolean(activeEditingBillId);
-
-  // Disable duplicate clicks while saving
-  isCloudSaving = true;
-  const actionButtons = [elements.btnGenerate, elements.btnPdf, elements.btnPrint].filter(Boolean);
-  actionButtons.forEach(btn => { btn.disabled = true; });
-
-  showToast(isEditing ? 'Updating Bill...' : 'Saving Bill...', 'success');
-
-  try {
-    const userBillsRef = firestoreDb
-      .collection('users')
-      .doc(currentUser.uid)
-      .collection('bills');
-
-    const billData = {
-      billNo: billNoVal,
-      partyChallanNo: challanNoVal,
-      billDate: dateVal,
-      partyName: partyNameVal,
-      subtotal: subtotal,
-      grandTotal: grandTotal,
-      items: items,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    if (isEditing) {
-      // Update existing Firestore document
-      await userBillsRef.doc(activeEditingBillId).update(billData);
-      showToast('Bill updated successfully.', 'success');
-      activeEditingBillId = null;
-      if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'none';
-    } else {
-      // Check if a bill with same Bill No already exists for this user (prevent duplicate)
-      const existing = firestoreBills.find(
-        b => b.billNo && b.billNo.trim().toLowerCase() === billNoVal.toLowerCase()
-      );
-
-      if (existing) {
-        // Update the existing document in place
-        await userBillsRef.doc(existing.id).update(billData);
-        showToast('Bill updated successfully.', 'success');
-      } else {
-        // Create new document
-        billData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        await userBillsRef.add(billData);
-        showToast('Bill saved successfully.', 'success');
-      }
-    }
-
-    updateCloudStatus('connected', '● Cloud Connected');
-    return true;
-  } catch (err) {
-    console.error('Error saving bill to Firestore:', err);
-    updateCloudStatus('problem', '● Cloud Connection Problem');
-    showToast('Unable to save bill. Please check your internet connection and Firebase configuration.', 'danger');
-    return false;
-  } finally {
-    isCloudSaving = false;
-    actionButtons.forEach(btn => { btn.disabled = false; });
-  }
-}
-
-/**
- * Handle "Generate Bill" action:
- * - Validates Bill No (must not be empty, otherwise shows "Please enter Bill No.")
- * - Calculates all row amounts and totals
- * - Updates Bill Preview DOM
- * - Automatically switches to: 2. BILL PREVIEW
- * - Saves bill to Firestore Cloud database
- * - Does NOT reload the page or lose data
- */
-async function generateBill() {
-  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
-
-  // If there is no Bill No., show: "Please enter Bill No."
-  if (!billNoVal) {
-    showToast('Please enter Bill No.', 'danger');
-    if (elements.billNoInput) {
-      if (elements.panelEditor && elements.panelEditor.style.display === 'none') {
-        switchTab('editor');
-      }
-      elements.billNoInput.focus();
-      elements.billNoInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      elements.billNoInput.classList.add('input-error');
-      setTimeout(() => {
-        if (elements.billNoInput) elements.billNoInput.classList.remove('input-error');
-      }, 2500);
-    }
-    return false;
-  }
-
-  // Calculate and sync preview with all entered values
-  calculateAndSync();
-
-  // Switch to preview tab immediately so user sees the generated bill
-  switchTab('preview');
-
-  // Save current bill to Firestore Cloud
-  await saveCurrentBillToFirestore();
-
-  return true;
-}
-
-let isPrinting = false;
-let isGeneratingPdf = false;
-
-/**
- * Handle "Save as PDF" action:
- * - Directly generates and downloads the PDF file using client-side libraries (jsPDF + html2canvas)
- * - NEVER calls window.print()
- * - Strictly single-page A4 format (210mm x 297mm) with 10mm margins
- * - Filename: AKSHAR_ARI_WORK_BILL_[BILL_NO].pdf (e.g. AKSHAR_ARI_WORK_BILL_1.pdf)
- * - Pure client-side execution, fully compatible with Android mobile Chrome & GitHub Pages
- * - Does NOT reload the page or lose any entered data
- */
-async function saveAsPDF() {
-  if (isGeneratingPdf) return;
-
-  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
-  if (!billNoVal) {
-    showToast('Please enter Bill No.', 'danger');
-    switchTab('editor');
-    if (elements.billNoInput) elements.billNoInput.focus();
-    return;
-  }
-
-  calculateAndSync();
-  switchTab('preview');
-
-  const billPreview = document.getElementById('bill-preview');
-  if (!billPreview) {
-    showToast('Error: Bill preview element not found.', 'danger');
-    return;
-  }
-
-  isGeneratingPdf = true;
-  showToast('Generating PDF... Please wait.', 'success');
-
-  const pdfButtons = [elements.btnPdf, elements.btnPreviewPdf].filter(Boolean);
-  pdfButtons.forEach(btn => {
-    btn.disabled = true;
-    btn.style.opacity = '0.7';
-  });
-
-  const billNoRaw = elements.billNoInput ? elements.billNoInput.value.trim() : '1';
-  const safeBillNo = billNoRaw.replace(/[^a-zA-Z0-9_-]/g, '_') || '1';
-  const fileName = `AKSHAR_ARI_WORK_BILL_${safeBillNo}.pdf`;
-
-  // Create off-screen clone with .pdf-render-mode to guarantee 794px A4 desktop layout
-  const clone = billPreview.cloneNode(true);
-  clone.id = 'bill-preview-pdf-clone';
-  clone.classList.add('pdf-render-mode');
-  clone.style.position = 'fixed';
-  clone.style.left = '0';
-  clone.style.top = '0';
-  clone.style.width = '794px';
-  clone.style.zIndex = '-9999';
-  clone.style.opacity = '1';
-  clone.style.visibility = 'visible';
-  clone.style.pointerEvents = 'none';
-  document.body.appendChild(clone);
-
-  try {
-    const hasHtml2Canvas = typeof window.html2canvas === 'function';
-    const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-
-    if (hasHtml2Canvas && jsPDFClass) {
-      const canvas = await window.html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1024
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDFClass({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
-
-      let pdfWidth = 190;
-      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      if (pdfHeight > 277) {
-        const scaleFactor = 277 / pdfHeight;
-        pdfHeight = 277;
-        pdfWidth = pdfWidth * scaleFactor;
-      }
-
-      const x = (210 - pdfWidth) / 2;
-      const y = 10;
-
-      pdf.addImage(imgData, 'PNG', x, y, pdfWidth, pdfHeight, undefined, 'FAST');
-      pdf.save(fileName);
-
-      showToast(`PDF downloaded: ${fileName}`, 'success');
-    } else if (typeof window.html2pdf === 'function') {
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, windowWidth: 1024, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      await window.html2pdf().set(opt).from(clone).save();
-      showToast(`PDF downloaded: ${fileName}`, 'success');
-    } else {
-      throw new Error('PDF library is not loaded. Please check your internet connection.');
-    }
-  } catch (err) {
-    console.error('Error generating PDF:', err);
-    showToast(`PDF generation error: ${err.message || 'Please try again'}`, 'danger');
-  } finally {
-    if (clone && clone.parentNode) {
-      clone.parentNode.removeChild(clone);
-    }
-    pdfButtons.forEach(btn => {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-    });
-    isGeneratingPdf = false;
-  }
-}
-
-/**
- * Handle "Print Bill" action:
- * - Generates the bill and updates preview
- * - Calls native browser window.print() after a 500ms delay
- */
-function printBill() {
-  if (isPrinting) return;
-  const billNoVal = elements.billNoInput ? elements.billNoInput.value.trim() : '';
-  if (!billNoVal) {
-    showToast('Please enter Bill No.', 'danger');
-    switchTab('editor');
-    if (elements.billNoInput) elements.billNoInput.focus();
-    return;
-  }
-
-  calculateAndSync();
-  switchTab('preview');
-
-  isPrinting = true;
-  showToast('Opening print dialog...', 'success');
-  setTimeout(function() {
-    window.print();
-    setTimeout(function() { isPrinting = false; }, 1000);
-  }, 500);
-}
-
-/**
- * Handle "Clear" action:
- * Prompts confirmation before clearing form fields
- */
-function handleClear() {
-  const confirmed = window.confirm('Are you sure you want to clear all entered party details and item fields?');
-  if (!confirmed) return;
-
-  if (elements.partyNameInput) elements.partyNameInput.value = '';
-  if (elements.challanNoInput) elements.challanNoInput.value = '';
-
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    if (descInput) descInput.value = '';
-    if (qtyInput) qtyInput.value = '';
-    if (rateInput) rateInput.value = '';
-  }
-
-  cancelEditMode(false);
-  calculateAndSync();
-  showToast('Form fields cleared.', 'danger');
-}
-
-/**
- * Handle "+ New Bill" action:
- * Resets form, advances Bill No if desired, and clears active edit mode
- */
-function handleNewBill() {
-  const confirmed = window.confirm('Start a new bill? Any unsaved changes on the current form will be reset.');
-  if (!confirmed) return;
-
-  if (elements.billNoInput) elements.billNoInput.value = '';
-  if (elements.challanNoInput) elements.challanNoInput.value = '';
-  if (elements.partyNameInput) elements.partyNameInput.value = '';
-  if (elements.billDateInput) elements.billDateInput.value = getTodayDateString();
-
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    if (descInput) descInput.value = '';
-    if (qtyInput) qtyInput.value = '';
-    if (rateInput) rateInput.value = '';
-  }
-
-  cancelEditMode(false);
-  calculateAndSync();
-  switchTab('editor');
-  showToast('New blank bill ready.', 'success');
-}
-
-/**
- * Cancel active edit mode and revert to standard creation
- * @param {boolean} notify
- */
-function cancelEditMode(notify = true) {
-  activeEditingBillId = null;
-  if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'none';
-  saveCurrentDraftToStorage();
-  if (notify) showToast('Edit mode cancelled.', 'success');
-}
-
-/* ==========================================================================
-   PARTY-NAME-WISE HISTORY DISPLAY & SEARCH
-   ========================================================================== */
-
-/**
- * Group bills by Party Name
- * @param {Array<Object>} bills
- * @returns {Array<Object>}
- */
-function groupBillsByParty(bills) {
-  const groupsMap = new Map();
-
-  bills.forEach(bill => {
-    const rawParty = (bill.partyName || '').trim();
-    const displayParty = rawParty || 'General / Cash';
-    const partyKey = rawParty ? rawParty.toLowerCase() : '__general_cash__';
-
-    if (!groupsMap.has(partyKey)) {
-      groupsMap.set(partyKey, {
-        partyName: displayParty,
-        partyKey: partyKey,
-        bills: [],
-        totalAmount: 0,
-        billCount: 0,
-        latestTimestamp: 0
-      });
-    }
-
-    const group = groupsMap.get(partyKey);
-    if (group.partyName === 'General / Cash' && rawParty) {
-      group.partyName = displayParty;
-    }
-
-    group.bills.push(bill);
-    const amount = Number(bill.grandTotal) || 0;
-    group.totalAmount += amount;
-    group.billCount++;
-
-    // Track latest bill timestamp for sorting
-    let billTimestamp = 0;
-    if (bill.createdAt) {
-      billTimestamp = bill.createdAt.toMillis ? bill.createdAt.toMillis() : new Date(bill.createdAt).getTime();
-    } else if (bill.billDate) {
-      billTimestamp = new Date(bill.billDate).getTime();
-    }
-    if (billTimestamp > group.latestTimestamp) {
-      group.latestTimestamp = billTimestamp;
-    }
-  });
-
-  const partyGroups = Array.from(groupsMap.values());
-
-  // Sort bills newest first within each party group
-  partyGroups.forEach(group => {
-    group.bills.sort((a, b) => {
-      const dateA = a.billDate || '';
-      const dateB = b.billDate || '';
-      if (dateA !== dateB) {
-        return dateB.localeCompare(dateA);
-      }
-      const timeA = a.updatedAt || a.createdAt || '';
-      const timeB = b.updatedAt || b.createdAt || '';
-      return String(timeB).localeCompare(String(timeA));
-    });
-  });
-
-  // Sort party groups by latest activity descending
-  partyGroups.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
-
-  return partyGroups;
-}
-
-/**
- * Toggle collapse/expand for a specific party group
- * @param {string} partyKey
- */
-function togglePartyGroup(partyKey) {
-  const safeId = 'party-group-' + encodeURIComponent(partyKey).replace(/%/g, '_');
-  const groupEl = document.getElementById(safeId);
-
-  if (collapsedPartyKeys.has(partyKey)) {
-    collapsedPartyKeys.delete(partyKey);
-    if (groupEl) {
-      groupEl.classList.remove('is-collapsed');
-      const headerBtn = groupEl.querySelector('.party-group-header');
-      if (headerBtn) headerBtn.setAttribute('aria-expanded', 'true');
-    }
-  } else {
-    collapsedPartyKeys.add(partyKey);
-    if (groupEl) {
-      groupEl.classList.add('is-collapsed');
-      const headerBtn = groupEl.querySelector('.party-group-header');
-      if (headerBtn) headerBtn.setAttribute('aria-expanded', 'false');
-    }
-  }
-}
-
-/**
- * Expand all party groups
- */
-function expandAllPartyGroups() {
-  collapsedPartyKeys.clear();
-  const allGroups = document.querySelectorAll('.party-group');
-  allGroups.forEach(el => {
-    el.classList.remove('is-collapsed');
-    const btn = el.querySelector('.party-group-header');
-    if (btn) btn.setAttribute('aria-expanded', 'true');
-  });
-}
-
-/**
- * Collapse all party groups
- */
-function collapseAllPartyGroups() {
-  const allGroups = document.querySelectorAll('.party-group');
-  allGroups.forEach(el => {
-    const key = el.getAttribute('data-party-key');
-    if (key) collapsedPartyKeys.add(key);
-    el.classList.add('is-collapsed');
-    const btn = el.querySelector('.party-group-header');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-  });
-}
-
-/**
- * Render Party-Name-Wise grouped history cards based on current search query
- * @param {string} filterQuery
- */
-function renderHistoryCards(filterQuery = null) {
-  if (!elements.historyCardsContainer) return;
-
-  if (!currentUser) {
-    if (elements.historyAuthRequired) elements.historyAuthRequired.style.display = 'block';
-    if (elements.historySearchCard) elements.historySearchCard.style.display = 'none';
-    elements.historyCardsContainer.innerHTML = '';
-    return;
-  }
-
-  const query = (filterQuery !== null ? filterQuery : (elements.historySearchInput ? elements.historySearchInput.value : '')).trim().toLowerCase();
-
-  if (elements.btnClearSearch) {
-    elements.btnClearSearch.style.display = query ? 'block' : 'none';
-  }
-
-  if (firestoreBills.length === 0) {
-    if (elements.historyCountText) elements.historyCountText.textContent = '0 saved bills';
-    elements.historyCardsContainer.innerHTML = `
-      <div class="history-empty-state">
-        <div class="empty-icon">📋</div>
-        <h3 class="empty-title">No Saved Bills in Cloud</h3>
-        <p class="empty-desc">Bills generated in "1. ENTER BILL" are automatically saved to your Firestore Cloud database and organized by Party Name here.</p>
-        <button class="btn btn-primary" type="button" onclick="switchTab('editor')">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Create First Bill
-        </button>
-      </div>
-    `;
-    return;
-  }
-
-  const allPartyGroups = groupBillsByParty(firestoreBills);
-
-  // Filter party groups or matching bills by Party Name, Bill No, or Challan No
-  let displayGroups = allPartyGroups;
-  if (query) {
-    displayGroups = [];
-    allPartyGroups.forEach(group => {
-      const matchParty = group.partyName.toLowerCase().includes(query);
-      if (matchParty) {
-        displayGroups.push(group);
-        collapsedPartyKeys.delete(group.partyKey);
-      } else {
-        const matchingBills = group.bills.filter(b => {
-          const matchBillNo = (b.billNo || '').toLowerCase().includes(query);
-          const matchChallan = (b.partyChallanNo || b.challanNo || '').toLowerCase().includes(query);
-          return matchBillNo || matchChallan;
+        editTableBody.addEventListener('click', (e) => {
+            const btn = (e.target && e.target.closest) ? e.target.closest('.btn-del-row') : null;
+            if (btn) {
+                const tr = btn.closest('tr');
+                if (tr) {
+                    tr.remove();
+                    renumberRows();
+                    recalcAll();
+                }
+            }
         });
-        if (matchingBills.length > 0) {
-          displayGroups.push({
-            ...group,
-            bills: matchingBills
-          });
-          collapsedPartyKeys.delete(group.partyKey);
+    }
+
+    // Initialize 10 blank rows
+    function initRows(count) {
+        const target = count || 10;
+        // If editTableBody already has rows (e.g. from static HTML)
+        if (editTableBody.children.length === target) {
+            Array.from(editTableBody.children).forEach(tr => {
+                wireRow(tr);
+            });
+            renumberRows();
+            recalcAll();
+            updatePreview();
+            return;
         }
-      }
-    });
-  }
-
-  // Update stats text
-  if (elements.historyCountText) {
-    const totalMatchingBills = displayGroups.reduce((acc, g) => acc + g.bills.length, 0);
-    const partyWord = displayGroups.length === 1 ? 'party' : 'parties';
-    if (query) {
-      elements.historyCountText.textContent = `Showing ${displayGroups.length} ${partyWord} (${totalMatchingBills} of ${firestoreBills.length} bills)`;
-    } else {
-      elements.historyCountText.textContent = `${displayGroups.length} ${partyWord} • ${firestoreBills.length} total bills`;
+        editTableBody.innerHTML = '';
+        for (let i = 0; i < target; i++) {
+            editTableBody.appendChild(createEditRow());
+        }
+        renumberRows();
+        recalcAll();
+        updatePreview();
     }
-  }
+    initRows(10);
 
-  if (displayGroups.length === 0) {
-    elements.historyCardsContainer.innerHTML = `
-      <div class="history-empty-state">
-        <div class="empty-icon">🔍</div>
-        <h3 class="empty-title">No Matching Parties or Bills</h3>
-        <p class="empty-desc">No party name, bill number, or challan number matching "<strong>${escapeHtml(query)}</strong>".</p>
-        <button class="btn btn-secondary" type="button" onclick="clearHistorySearch()">Clear Search</button>
-      </div>
-    `;
-    return;
-  }
+    // Set today's date
+    inpDate.value = new Date().toISOString().split('T')[0];
 
-  // Render Party Groups
-  const groupsHtml = displayGroups.map(group => {
-    const isCollapsed = collapsedPartyKeys.has(group.partyKey);
-    const safeId = 'party-group-' + encodeURIComponent(group.partyKey).replace(/%/g, '_');
-
-    const billsHtml = group.bills.map(bill => {
-      const filledItems = (bill.items || []).filter(it => (it.desc || it.description) || parseFloat(it.qty || it.quantity) > 0 || parseFloat(it.rate) > 0);
-      const firstFilledDesc = filledItems.length > 0 && (filledItems[0].desc || filledItems[0].description) ? (filledItems[0].desc || filledItems[0].description) : 'No item descriptions';
-      const challanNo = bill.partyChallanNo || bill.challanNo;
-      const challanBadgeHtml = challanNo 
-        ? `<span class="pb-challan-badge">Challan: ${escapeHtml(challanNo)}</span>`
-        : '';
-
-      return `
-        <div class="party-bill-card" id="h-card-${escapeHtml(bill.id)}">
-          <div class="pb-meta-line">
-            <div class="pb-badge-group">
-              <span class="pb-bill-badge">Bill No: ${escapeHtml(bill.billNo || '---')}</span>
-              ${challanBadgeHtml}
-            </div>
-            <span class="pb-date">Date: ${formatDateDisplay(bill.billDate)}</span>
-          </div>
-
-          <div class="pb-data-line">
-            <div class="pb-total-group">
-              <span class="pb-total-lbl">Grand Total:</span>
-              <span class="pb-total-val">${formatCurrency(bill.grandTotal || 0)}</span>
-            </div>
-            <div class="pb-items-summary" title="${escapeHtml(firstFilledDesc)}">
-              <span class="pb-items-pill">${filledItems.length} item${filledItems.length === 1 ? '' : 's'}</span>
-              <span class="pb-first-desc">${escapeHtml(firstFilledDesc)}</span>
-            </div>
-          </div>
-
-          <div class="pb-actions-line">
-            <button class="btn btn-secondary" type="button" onclick="viewHistoryBill('${escapeHtml(bill.id)}')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              View
-            </button>
-            <button class="btn btn-secondary" type="button" onclick="editHistoryBill('${escapeHtml(bill.id)}')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Edit
-            </button>
-            <button class="btn btn-danger-outline" type="button" onclick="deleteHistoryBill('${escapeHtml(bill.id)}')">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Delete
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    const escapedPartyKey = escapeHtml(group.partyKey).replace(/'/g, "\\'");
-
-    return `
-      <div class="party-group ${isCollapsed ? 'is-collapsed' : ''}" id="${safeId}" data-party-key="${escapeHtml(group.partyKey)}">
-        <div class="party-group-header" role="button" tabindex="0" aria-expanded="${!isCollapsed}" onclick="togglePartyGroup('${escapedPartyKey}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePartyGroup('${escapedPartyKey}');}">
-          <div class="party-header-info">
-            <div class="party-name-row">
-              <span class="party-name-label">PARTY:</span>
-              <span class="party-name-title">${escapeHtml(group.partyName)}</span>
-            </div>
-            <div class="party-meta-row">
-              <span class="party-bills-badge">${group.billCount} Bill${group.billCount === 1 ? '' : 's'}</span>
-              <span class="party-total-badge">Total: ${formatCurrency(group.totalAmount)}</span>
-            </div>
-          </div>
-          <div class="party-chevron-box" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-        <div class="party-bills-list">
-          ${billsHtml}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  elements.historyCardsContainer.innerHTML = groupsHtml;
-}
-
-/**
- * Load selected Firestore bill into Form and set active editing mode
- * @param {string} id
- */
-function editHistoryBill(id) {
-  const bill = firestoreBills.find(b => b.id === id);
-  if (!bill) {
-    showToast('Bill not found.', 'danger');
-    return;
-  }
-
-  // Load into inputs
-  if (elements.billNoInput) elements.billNoInput.value = bill.billNo || '';
-  if (elements.challanNoInput) elements.challanNoInput.value = bill.partyChallanNo || bill.challanNo || '';
-  if (elements.billDateInput) elements.billDateInput.value = bill.billDate || getTodayDateString();
-  if (elements.partyNameInput) elements.partyNameInput.value = bill.partyName || '';
-
-  const items = Array.isArray(bill.items) ? bill.items : [];
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    const item = items[i - 1];
-    if (descInput) descInput.value = item && (item.description !== undefined || item.desc !== undefined) ? (item.description || item.desc) : '';
-    if (qtyInput) qtyInput.value = item && (item.quantity !== undefined || item.qty !== undefined) ? (item.quantity || item.qty) : '';
-    if (rateInput) rateInput.value = item && item.rate !== undefined ? item.rate : '';
-  }
-
-  // Enable active edit mode
-  activeEditingBillId = bill.id;
-  if (elements.editingModeBanner) elements.editingModeBanner.style.display = 'flex';
-  if (elements.editingBillLabel) elements.editingBillLabel.textContent = `Bill #${bill.billNo || '---'}`;
-
-  calculateAndSync();
-  switchTab('editor');
-  showToast(`Loaded Bill #${bill.billNo || ''} for editing.`, 'success');
-}
-
-/**
- * Load selected Firestore bill directly into Preview mode
- * @param {string} id
- */
-function viewHistoryBill(id) {
-  const bill = firestoreBills.find(b => b.id === id);
-  if (!bill) {
-    showToast('Bill not found.', 'danger');
-    return;
-  }
-
-  // Populate preview DOM
-  if (elements.billNoInput) elements.billNoInput.value = bill.billNo || '';
-  if (elements.challanNoInput) elements.challanNoInput.value = bill.partyChallanNo || bill.challanNo || '';
-  if (elements.billDateInput) elements.billDateInput.value = bill.billDate || getTodayDateString();
-  if (elements.partyNameInput) elements.partyNameInput.value = bill.partyName || '';
-
-  const items = Array.isArray(bill.items) ? bill.items : [];
-  for (let i = 1; i <= TOTAL_ROWS; i++) {
-    const descInput = document.getElementById(`item-desc-${i}`);
-    const qtyInput = document.getElementById(`item-qty-${i}`);
-    const rateInput = document.getElementById(`item-rate-${i}`);
-
-    const item = items[i - 1];
-    if (descInput) descInput.value = item && (item.description !== undefined || item.desc !== undefined) ? (item.description || item.desc) : '';
-    if (qtyInput) qtyInput.value = item && (item.quantity !== undefined || item.qty !== undefined) ? (item.quantity || item.qty) : '';
-    if (rateInput) rateInput.value = item && item.rate !== undefined ? item.rate : '';
-  }
-
-  calculateAndSync();
-  switchTab('preview');
-  showToast(`Viewing Bill #${bill.billNo || ''}`, 'success');
-}
-
-/**
- * Open delete confirmation modal for a specific bill
- * @param {string} id
- */
-function deleteHistoryBill(id) {
-  const bill = firestoreBills.find(b => b.id === id);
-  if (!bill) return;
-
-  billIdToDelete = id;
-  if (elements.deleteBillInfo) {
-    const challanInfo = bill.partyChallanNo || bill.challanNo ? ` | Challan: ${bill.partyChallanNo || bill.challanNo}` : '';
-    elements.deleteBillInfo.textContent = `Bill No: ${bill.billNo || '---'}${challanInfo} | Party: ${bill.partyName || 'General / Cash'} | Total: ${formatCurrency(bill.grandTotal || 0)}`;
-  }
-
-  if (elements.deleteModal) {
-    elements.deleteModal.style.display = 'flex';
-  }
-}
-
-/**
- * Close delete modal
- */
-function closeDeleteModal() {
-  billIdToDelete = null;
-  if (elements.deleteModal) elements.deleteModal.style.display = 'none';
-}
-
-/**
- * Confirm and delete bill from Firestore Cloud
- */
-async function confirmDeleteBill() {
-  if (!billIdToDelete || isCloudDeleting) return;
-
-  if (!currentUser || !firestoreDb) {
-    showToast('You must be logged in to delete bills from Firestore.', 'danger');
-    closeDeleteModal();
-    return;
-  }
-
-  isCloudDeleting = true;
-  if (elements.btnConfirmDelete) elements.btnConfirmDelete.disabled = true;
-
-  showToast('Deleting Bill...', 'success');
-
-  try {
-    await firestoreDb
-      .collection('users')
-      .doc(currentUser.uid)
-      .collection('bills')
-      .doc(billIdToDelete)
-      .delete();
-
-    if (activeEditingBillId === billIdToDelete) {
-      cancelEditMode(false);
-    }
-
-    showToast('Bill deleted successfully.', 'danger');
-    closeDeleteModal();
-  } catch (err) {
-    console.error('Error deleting bill from Firestore:', err);
-    showToast('Failed to delete bill from cloud. Please try again.', 'danger');
-  } finally {
-    isCloudDeleting = false;
-    if (elements.btnConfirmDelete) elements.btnConfirmDelete.disabled = false;
-  }
-}
-
-/**
- * Clear all history after user confirmation
- */
-async function handleClearAllHistory() {
-  if (!currentUser || !firestoreDb) {
-    showToast('Please log in with Firebase first.', 'danger');
-    return;
-  }
-
-  if (firestoreBills.length === 0) {
-    showToast('History is already empty.', 'danger');
-    return;
-  }
-
-  const confirmed = window.confirm('Are you sure you want to delete ALL saved bills from your Firestore cloud database? This cannot be undone.');
-  if (!confirmed) return;
-
-  showToast('Deleting all bills from cloud...', 'success');
-
-  try {
-    const batch = firestoreDb.batch();
-    firestoreBills.forEach(b => {
-      const docRef = firestoreDb
-        .collection('users')
-        .doc(currentUser.uid)
-        .collection('bills')
-        .doc(b.id);
-      batch.delete(docRef);
+    btnAddRow.addEventListener('click', () => {
+        editTableBody.appendChild(createEditRow());
+        renumberRows();
+        updatePreview();
     });
 
-    await batch.commit();
-    cancelEditMode(false);
-    showToast('All saved bill history has been cleared.', 'danger');
-  } catch (err) {
-    console.error('Error clearing cloud history:', err);
-    showToast('Failed to clear cloud history. Please try again.', 'danger');
-  }
-}
-
-/**
- * Manually refresh history from Firestore Cloud
- */
-function refreshHistoryFromCloud() {
-  if (!currentUser) {
-    openAuthModal();
-    return;
-  }
-  showToast('Syncing with Firestore Cloud...', 'success');
-  subscribeToFirestoreBills();
-}
-
-/**
- * Clear the history search input and re-render
- */
-function clearHistorySearch() {
-  if (elements.historySearchInput) {
-    elements.historySearchInput.value = '';
-    elements.historySearchInput.focus();
-  }
-  renderHistoryCards();
-}
-
-/* ==========================================================================
-   LOCALSTORAGE TO CLOUD MIGRATION FEATURE
-   ========================================================================== */
-
-/**
- * Check if device contains legacy localStorage history and prompt user
- */
-function checkLocalHistoryForMigration() {
-  if (!currentUser) return;
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_LEGACY_HISTORY);
-    if (!raw) {
-      if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
-      return;
-    }
-
-    const legacyList = JSON.parse(raw);
-    if (Array.isArray(legacyList) && legacyList.length > 0) {
-      if (elements.migrationBanner) elements.migrationBanner.style.display = 'block';
-      if (elements.localBillsCount) elements.localBillsCount.textContent = legacyList.length;
-      if (elements.modalLocalBillsCount) elements.modalLocalBillsCount.textContent = legacyList.length;
-    } else {
-      if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
-    }
-  } catch (e) {
-    if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
-  }
-}
-
-/**
- * Open migration confirmation modal
- */
-function promptMigrateLocalHistory() {
-  if (!currentUser) {
-    openAuthModal();
-    return;
-  }
-  if (elements.migrateModal) elements.migrateModal.style.display = 'flex';
-  if (elements.migrateStatusBox) elements.migrateStatusBox.style.display = 'none';
-}
-
-/**
- * Close migration modal
- */
-function closeMigrateModal() {
-  if (elements.migrateModal) elements.migrateModal.style.display = 'none';
-}
-
-/**
- * Upload legacy localStorage bills to Firestore without creating duplicates
- */
-async function executeLocalMigration() {
-  if (isCloudMigrating || !currentUser || !firestoreDb) return;
-
-  let legacyList = [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_LEGACY_HISTORY);
-    legacyList = raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    legacyList = [];
-  }
-
-  if (legacyList.length === 0) {
-    showToast('No local bills found to migrate.', 'danger');
-    closeMigrateModal();
-    return;
-  }
-
-  isCloudMigrating = true;
-  if (elements.btnConfirmMigrate) {
-    elements.btnConfirmMigrate.disabled = true;
-    elements.btnConfirmMigrate.textContent = 'Migrating...';
-  }
-
-  if (elements.migrateStatusBox) {
-    elements.migrateStatusBox.style.display = 'block';
-    elements.migrateStatusBox.className = 'alert-box alert-warning';
-    elements.migrateStatusBox.textContent = `Uploading ${legacyList.length} bills to Firestore... Please wait.`;
-  }
-
-  let migratedCount = 0;
-  let skippedCount = 0;
-
-  try {
-    const userBillsRef = firestoreDb
-      .collection('users')
-      .doc(currentUser.uid)
-      .collection('bills');
-
-    for (const b of legacyList) {
-      const billNo = (b.billNo || '').trim();
-      if (!billNo) continue;
-
-      // Prevent duplicate migration if bill with matching Bill No already exists
-      const alreadyExists = firestoreBills.some(
-        fb => fb.billNo && fb.billNo.trim().toLowerCase() === billNo.toLowerCase()
-      );
-
-      if (alreadyExists) {
-        skippedCount++;
-        continue;
-      }
-
-      const formattedItems = (b.items || []).map((it, idx) => ({
-        srNo: idx + 1,
-        description: it.desc || it.description || '',
-        quantity: Number(it.qty || it.quantity) || 0,
-        rate: Number(it.rate) || 0,
-        amount: Number(it.amount) || 0
-      }));
-
-      await userBillsRef.add({
-        billNo: billNo,
-        partyChallanNo: b.challanNo || b.partyChallanNo || '',
-        billDate: b.billDate || getTodayDateString(),
-        partyName: b.partyName || '',
-        subtotal: Number(b.subtotal) || 0,
-        grandTotal: Number(b.grandTotal) || 0,
-        items: formattedItems,
-        createdAt: b.createdAt ? new Date(b.createdAt) : firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      migratedCount++;
-    }
-
-    if (elements.migrateStatusBox) {
-      elements.migrateStatusBox.className = 'alert-box';
-      elements.migrateStatusBox.style.backgroundColor = '#ecfdf5';
-      elements.migrateStatusBox.style.color = '#065f46';
-      elements.migrateStatusBox.textContent = `${migratedCount} bills migrated successfully! ${skippedCount > 0 ? `(${skippedCount} skipped as already present).` : ''}`;
-    }
-
-    showToast(`${migratedCount} bills migrated successfully to Cloud.`, 'success');
-
-    // Hide banner
-    if (elements.migrationBanner) elements.migrationBanner.style.display = 'none';
-
-    setTimeout(() => {
-      closeMigrateModal();
-    }, 2200);
-
-  } catch (err) {
-    console.error('Migration error:', err);
-    if (elements.migrateStatusBox) {
-      elements.migrateStatusBox.className = 'alert-box';
-      elements.migrateStatusBox.style.backgroundColor = '#fef2f2';
-      elements.migrateStatusBox.style.color = '#991b1b';
-      elements.migrateStatusBox.textContent = 'Migration failed. Please check your internet connection.';
-    }
-    showToast('Migration error. Please try again.', 'danger');
-  } finally {
-    isCloudMigrating = false;
-    if (elements.btnConfirmMigrate) {
-      elements.btnConfirmMigrate.disabled = false;
-      elements.btnConfirmMigrate.textContent = 'Migrate to Cloud';
-    }
-  }
-}
-
-/* ==========================================================================
-   AUTHENTICATION MODAL & ACCOUNT MANAGEMENT
-   ========================================================================== */
-
-/**
- * Handle clicking on top header cloud status badge
- */
-function handleCloudStatusClick() {
-  if (currentUser) {
-    openAccountModal();
-  } else {
-    openAuthModal();
-  }
-}
-
-/**
- * Open authentication modal
- */
-function openAuthModal() {
-  if (typeof isFirebaseConfigured === 'function' && !isFirebaseConfigured()) {
-    if (elements.authConfigWarning) elements.authConfigWarning.style.display = 'block';
-  } else {
-    if (elements.authConfigWarning) elements.authConfigWarning.style.display = 'none';
-  }
-
-  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
-  if (elements.authModal) elements.authModal.style.display = 'flex';
-}
-
-/**
- * Close authentication modal
- */
-function closeAuthModal() {
-  if (elements.authModal) elements.authModal.style.display = 'none';
-}
-
-/**
- * Open business account modal
- */
-function openAccountModal() {
-  if (!currentUser) return;
-  if (elements.accountUserEmail) elements.accountUserEmail.textContent = currentUser.email || 'Business Owner';
-  if (elements.accountBillsCount) elements.accountBillsCount.textContent = firestoreBills.length;
-  if (elements.accountModal) elements.accountModal.style.display = 'flex';
-}
-
-/**
- * Close business account modal
- */
-function closeAccountModal() {
-  if (elements.accountModal) elements.accountModal.style.display = 'none';
-}
-
-/**
- * Toggle between Login and Register modes
- */
-function toggleAuthMode() {
-  if (authMode === 'login') {
-    authMode = 'register';
-    if (elements.authModalTitleText) elements.authModalTitleText.textContent = 'Create Business Account';
-    if (elements.btnAuthSubmitText) elements.btnAuthSubmitText.textContent = 'Register & Connect';
-    if (elements.authTogglePrompt) elements.authTogglePrompt.textContent = 'Already have an account?';
-    if (elements.btnAuthModeToggle) elements.btnAuthModeToggle.textContent = 'Log In Here';
-  } else {
-    authMode = 'login';
-    if (elements.authModalTitleText) elements.authModalTitleText.textContent = 'Cloud Login';
-    if (elements.btnAuthSubmitText) elements.btnAuthSubmitText.textContent = 'Log In';
-    if (elements.authTogglePrompt) elements.authTogglePrompt.textContent = "Don't have an account yet?";
-    if (elements.btnAuthModeToggle) elements.btnAuthModeToggle.textContent = 'Create Business Account';
-  }
-  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
-}
-
-/**
- * Toggle password visibility
- */
-function togglePasswordVisibility() {
-  if (!elements.authPassword) return;
-  const isPwd = elements.authPassword.type === 'password';
-  elements.authPassword.type = isPwd ? 'text' : 'password';
-}
-
-/**
- * Handle Auth Form submission (Login / Register)
- * @param {Event} e
- */
-async function handleAuthSubmit(e) {
-  e.preventDefault();
-
-  if (!firebaseAuth) {
-    if (elements.authErrorMsg) {
-      elements.authErrorMsg.textContent = 'Firebase is not initialized. Please configure firebase-config.js.';
-      elements.authErrorMsg.style.display = 'block';
-    }
-    return;
-  }
-
-  const email = elements.authEmail ? elements.authEmail.value.trim() : '';
-  const password = elements.authPassword ? elements.authPassword.value : '';
-
-  if (!email || !password) {
-    if (elements.authErrorMsg) {
-      elements.authErrorMsg.textContent = 'Please enter both email and password.';
-      elements.authErrorMsg.style.display = 'block';
-    }
-    return;
-  }
-
-  if (elements.btnAuthSubmit) elements.btnAuthSubmit.disabled = true;
-  if (elements.authErrorMsg) elements.authErrorMsg.style.display = 'none';
-
-  try {
-    if (authMode === 'login') {
-      await firebaseAuth.signInWithEmailAndPassword(email, password);
-      showToast('Logged in successfully.', 'success');
-    } else {
-      await firebaseAuth.createUserWithEmailAndPassword(email, password);
-      showToast('Account created & logged in.', 'success');
-    }
-    closeAuthModal();
-  } catch (err) {
-    console.error('Firebase Auth error:', err);
-    let msg = 'Authentication failed. Please check your credentials.';
-    if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-      msg = 'Invalid email or password.';
-    } else if (err.code === 'auth/email-already-in-use') {
-      msg = 'This email is already registered. Please log in.';
-    } else if (err.code === 'auth/weak-password') {
-      msg = 'Password is too weak. Please use at least 6 characters.';
-    } else if (err.code === 'auth/network-request-failed') {
-      msg = 'Network error. Please check your internet connection.';
-    } else if (err.message) {
-      msg = err.message;
-    }
-    if (elements.authErrorMsg) {
-      elements.authErrorMsg.textContent = msg;
-      elements.authErrorMsg.style.display = 'block';
-    }
-  } finally {
-    if (elements.btnAuthSubmit) elements.btnAuthSubmit.disabled = false;
-  }
-}
-
-/**
- * Handle user logout
- */
-async function handleLogout() {
-  if (!firebaseAuth) return;
-  try {
-    await firebaseAuth.signOut();
-    closeAccountModal();
-    showToast('Logged out successfully.', 'success');
-  } catch (err) {
-    console.error('Logout error:', err);
-    showToast('Logout error.', 'danger');
-  }
-}
-
-/**
- * Sanitize HTML entities to prevent XSS in inputs
- * @param {string} str 
- * @returns {string}
- */
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-/**
- * Setup Global Event Listeners
- */
-function setupEventListeners() {
-  // Navigation Tabs
-  if (elements.tabEditor) elements.tabEditor.addEventListener('click', () => switchTab('editor'));
-  if (elements.tabPreview) elements.tabPreview.addEventListener('click', () => switchTab('preview'));
-  if (elements.tabHistory) elements.tabHistory.addEventListener('click', () => switchTab('history'));
-
-  // History Controls
-  if (elements.historySearchInput) {
-    elements.historySearchInput.addEventListener('input', (e) => {
-      renderHistoryCards(e.target.value);
+    btnDeleteRow.addEventListener('click', () => {
+        if (editTableBody.children.length > 1) {
+            editTableBody.lastElementChild.remove();
+            renumberRows();
+            recalcAll();
+            updatePreview();
+        }
     });
-  }
-  if (elements.btnClearSearch) elements.btnClearSearch.addEventListener('click', clearHistorySearch);
-  if (elements.btnClearHistory) elements.btnClearHistory.addEventListener('click', handleClearAllHistory);
 
-  // Form Inputs
-  if (elements.billNoInput) elements.billNoInput.addEventListener('input', calculateAndSync);
-  if (elements.challanNoInput) elements.challanNoInput.addEventListener('input', calculateAndSync);
-  if (elements.partyNameInput) elements.partyNameInput.addEventListener('input', calculateAndSync);
-  if (elements.billDateInput) elements.billDateInput.addEventListener('change', calculateAndSync);
+    ['input', 'change', 'keyup', 'blur'].forEach(evt => {
+        inpDiscount.addEventListener(evt, recalcAll);
+    });
 
-  // Form Buttons Grid
-  if (elements.btnNewBill) elements.btnNewBill.addEventListener('click', handleNewBill);
-  if (elements.btnClear) elements.btnClear.addEventListener('click', handleClear);
-  if (elements.btnGenerate) elements.btnGenerate.addEventListener('click', generateBill);
-  if (elements.btnPrint) elements.btnPrint.addEventListener('click', printBill);
-  if (elements.btnPdf) elements.btnPdf.addEventListener('click', saveAsPDF);
+    // Payment checkbox
+    chkPayment.addEventListener('change', () => {
+        paymentFields.classList.toggle('hidden', !chkPayment.checked);
+        if (chkPayment.checked && !inpPayDate.value) {
+            inpPayDate.value = new Date().toISOString().split('T')[0];
+        }
+        updatePreview();
+    });
 
-  // Preview Header Buttons
-  if (elements.btnBackToEdit) elements.btnBackToEdit.addEventListener('click', () => switchTab('editor'));
-  if (elements.btnPreviewPrint) elements.btnPreviewPrint.addEventListener('click', printBill);
-  if (elements.btnPreviewPdf) elements.btnPreviewPdf.addEventListener('click', saveAsPDF);
+    // Real-time preview update on form field changes
+    [inpBillNo, inpChallan, inpDate, inpPartyName, inpPartyDetails].forEach(el => {
+        if (!el) return;
+        ['input', 'change', 'keyup', 'blur'].forEach(evt => {
+            el.addEventListener(evt, updatePreview);
+        });
+    });
 
-  // Attach Item listeners
-  attachItemEventListeners();
+    // Delegation on page-bill for instant updates
+    const pageBillEl = $('page-bill');
+    if (pageBillEl && pageBillEl.addEventListener) {
+        ['input', 'change', 'keyup'].forEach(evt => {
+            pageBillEl.addEventListener(evt, () => {
+                updatePreview();
+            });
+        });
+    }
+
+    // ========== BILL PREVIEW ==========
+    function updatePreview() {
+        prevBillNo.textContent = inpBillNo.value || '';
+        prevChallan.textContent = inpChallan.value || '';
+        prevDate.textContent = formatDateDisplay(inpDate.value);
+        prevPartyName.textContent = inpPartyName.value || '';
+
+        const details = inpPartyDetails.value.trim();
+        if (details) {
+            prevPartyDetails.textContent = details;
+            prevPartyDetailsRow.style.display = '';
+        } else {
+            prevPartyDetailsRow.style.display = 'none';
+        }
+
+        // Rebuild preview table
+        prevTableBody.innerHTML = '';
+        const rows = editTableBody.querySelectorAll('tr');
+        // We always show at least 10 rows in preview
+        const rowCount = Math.max(rows.length, 10);
+        for (let i = 0; i < rowCount; i++) {
+            const tr = document.createElement('tr');
+            if (i < rows.length) {
+                const editRow = rows[i];
+                const inDesc = editRow.children[1] ? (editRow.children[1].querySelector('input') || editRow.children[1].firstChild) : null;
+                const inQty  = editRow.children[2] ? (editRow.children[2].querySelector('input') || editRow.children[2].firstChild) : null;
+                const inRate = editRow.children[3] ? (editRow.children[3].querySelector('input') || editRow.children[3].firstChild) : null;
+                const inAmt  = editRow.children[4] ? (editRow.children[4].querySelector('input') || editRow.children[4].firstChild) : null;
+                const desc = inDesc ? (inDesc.value || '') : '';
+                const qty  = inQty ? (inQty.value || '') : '';
+                const rate = inRate ? (inRate.value || '') : '';
+                const amt  = inAmt ? (inAmt.value || '') : '';
+                tr.innerHTML = `<td>${i+1}</td><td>${desc}</td><td>${qty}</td><td>${rate}</td><td>${amt}</td>`;
+            } else {
+                tr.innerHTML = `<td>${i+1}</td><td></td><td></td><td></td><td></td>`;
+            }
+            prevTableBody.appendChild(tr);
+        }
+
+        // Totals
+        const sub = parseFloat(inpSubtotal.value) || 0;
+        const discountPct = parseFloat(inpDiscount.value) || 0;
+        const discountAmount = parseFloat(inpDiscountAmount ? inpDiscountAmount.value : 0) || 0;
+        const grand = parseFloat(inpGrandTotal.value) || 0;
+
+        prevSubtotal.textContent = '₹' + formatIndianNumber(sub);
+
+        if (discountPct > 0 && discountAmount > 0) {
+            const pStr = Number.isInteger(discountPct) ? discountPct : discountPct.toFixed(2);
+            if (prevDiscountLabel) {
+                prevDiscountLabel.textContent = `Discount (${pStr}%):`;
+            }
+            prevDiscount.textContent = '₹' + formatIndianNumber(discountAmount);
+            prevDiscountRow.style.display = '';
+        } else {
+            prevDiscountRow.style.display = 'none';
+        }
+
+        prevGrandTotal.textContent = '₹' + formatIndianNumber(grand);
+    }
+
+    function formatDateDisplay(dateStr) {
+        if (!dateStr) return '--/--/----';
+        const str = String(dateStr).trim();
+        const parts = str.split(/[-/]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                return parts[2].padStart(2, '0') + '/' + parts[1].padStart(2, '0') + '/' + parts[0];
+            } else if (parts[2].length === 4) {
+                // DD-MM-YYYY or MM-DD-YYYY
+                return parts[0].padStart(2, '0') + '/' + parts[1].padStart(2, '0') + '/' + parts[2];
+            }
+        }
+        const d = new Date(str);
+        if (isNaN(d.getTime())) return str;
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return dd + '/' + mm + '/' + yyyy;
+    }
+
+    function formatIndianNumber(num) {
+        if (num === 0) return '0.00';
+        const parts = num.toFixed(2).split('.');
+        let intPart = parts[0];
+        const decPart = parts[1];
+        // Indian number system: last 3 digits, then groups of 2
+        if (intPart.length > 3) {
+            const last3 = intPart.slice(-3);
+            let rest = intPart.slice(0, -3);
+            // Add comma every 2 digits from right in the remaining part
+            rest = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+            intPart = rest + ',' + last3;
+        }
+        return intPart + '.' + decPart;
+    }
+
+    // Initial preview
+    updatePreview();
+
+    // ========== PERSISTENCE (localStorage) ==========
+    function loadBills() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed.filter(b => b && typeof b === 'object') : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveBillsToStorage(bills) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(bills));
+    }
+
+    function showStatus(msg, type) {
+        statusMsg.textContent = msg;
+        statusMsg.className = 'status-msg ' + type;
+        setTimeout(() => { statusMsg.className = 'status-msg'; }, 4000);
+    }
+
+    function generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+    }
+
+    function collectFormData() {
+        const items = [];
+        editTableBody.querySelectorAll('tr').forEach(tr => {
+            const inDesc = tr.children[1] ? (tr.children[1].querySelector('input') || tr.children[1].firstChild) : null;
+            const inQty  = tr.children[2] ? (tr.children[2].querySelector('input') || tr.children[2].firstChild) : null;
+            const inRate = tr.children[3] ? (tr.children[3].querySelector('input') || tr.children[3].firstChild) : null;
+            const inAmt  = tr.children[4] ? (tr.children[4].querySelector('input') || tr.children[4].firstChild) : null;
+            const desc = inDesc ? inDesc.value.trim() : '';
+            const qty  = parseFloat(inQty ? inQty.value : 0) || 0;
+            const rate = parseFloat(inRate ? inRate.value : 0) || 0;
+            const amt  = parseFloat(inAmt ? inAmt.value : 0) || 0;
+            items.push({ desc, qty, rate, amount: amt });
+        });
+
+        const subtotal = parseFloat(inpSubtotal.value) || 0;
+        let discountPercent = parseFloat(inpDiscount.value) || 0;
+        if (discountPercent < 0) discountPercent = 0;
+        if (discountPercent > 100) discountPercent = 100;
+        const discountAmount = (subtotal * discountPercent) / 100;
+
+        const grandTotal = Math.max(0, subtotal - discountAmount);
+        const amtReceived = parseFloat(inpAmtReceived.value) || 0;
+        const pendingAmount = Math.max(0, grandTotal - amtReceived);
+
+        let paymentStatus = 'pending';
+        if (amtReceived >= grandTotal && grandTotal > 0) paymentStatus = 'paid';
+        else if (amtReceived > 0) paymentStatus = 'partial';
+
+        return {
+            id: editingBillId || generateId(),
+            billNumber: inpBillNo.value.trim(),
+            challanNumber: inpChallan.value.trim(),
+            date: inpDate.value,
+            partyName: inpPartyName.value.trim(),
+            partyDetails: inpPartyDetails.value.trim(),
+            items,
+            subtotal,
+            discountPercent,
+            discountAmount,
+            discount: discountAmount,
+            grandTotal,
+            paymentReceived: chkPayment.checked,
+            amountReceived: amtReceived,
+            paymentDate: inpPayDate.value,
+            pendingAmount,
+            paymentStatus,
+            payments: [],  // payment history array
+            createdAt: new Date().toISOString()
+        };
+    }
+
+    // ========== SAVE ==========
+    btnSave.addEventListener('click', async () => {
+        // Validate
+        const partyName = inpPartyName.value.trim();
+        const billNo = inpBillNo.value.trim();
+        const challan = inpChallan.value.trim();
+        const date = inpDate.value;
+
+        if (!billNo || !date || !partyName || !challan) {
+            showStatus('Please fill Bill No, Date, Party Name, and Challan No.', 'error');
+            return;
+        }
+
+        // Prevent accidental duplicate clicks
+        if (btnSave.disabled) return;
+        btnSave.disabled = true;
+        const originalText = btnSave.innerHTML;
+        btnSave.innerHTML = '⏳ Saving Bill...';
+
+        try {
+            const bills = loadBills();
+            const billData = collectFormData();
+            billData.partyName = partyName; // explicitly trimmed party name
+
+            if (editingBillId) {
+                // Update existing bill document
+                const idx = bills.findIndex(b => b.id === editingBillId);
+                if (idx !== -1) {
+                    billData.id = editingBillId;
+                    billData.payments = bills[idx].payments || [];
+                    billData.createdAt = bills[idx].createdAt || billData.createdAt;
+                    bills[idx] = billData;
+                } else {
+                    bills.push(billData);
+                }
+                editingBillId = null;
+            } else {
+                // Check for duplicate bill number
+                const existing = bills.find(b => b.billNumber === billData.billNumber);
+                if (existing) {
+                    if (!confirm('Bill number "' + billData.billNumber + '" already exists. Do you want to overwrite it?')) {
+                        btnSave.disabled = false;
+                        btnSave.innerHTML = originalText;
+                        return;
+                    }
+                    const idx = bills.findIndex(b => b.id === existing.id);
+                    billData.id = existing.id; // preserve document ID
+                    billData.payments = existing.payments || [];
+                    billData.createdAt = existing.createdAt || billData.createdAt;
+                    bills[idx] = billData;
+                } else {
+                    bills.push(billData);
+                }
+            }
+
+            // Save to local cache first
+            saveBillsToStorage(bills);
+            renderPending();
+            renderHistory();
+            if (typeof renderDashboard === 'function') renderDashboard();
+
+            // Sync with Firestore Cloud DB
+            let cloudSaved = false;
+            if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+                updateSyncStatus('syncing', 'Syncing...');
+                cloudSaved = await window.CloudDB.saveBill(billData);
+                updateSyncStatus('cloud', '☁️ Cloud Synced');
+            }
+
+            if (cloudSaved) {
+                showStatus(`Bill ${billData.billNumber} (${billData.partyName}) saved to Cloud & History successfully!`, 'success');
+            } else {
+                showStatus(`Bill ${billData.billNumber} saved successfully! (Local storage cache)`, 'success');
+            }
+        } catch (err) {
+            console.error('Error saving bill:', err);
+            showStatus('Error saving bill: ' + (err.message || 'Unknown error'), 'error');
+        } finally {
+            btnSave.disabled = false;
+            btnSave.innerHTML = originalText;
+        }
+    });
+
+    // ========== RESET ==========
+    btnReset.addEventListener('click', () => {
+        if (confirm('Reset the form? Unsaved changes will be lost.')) {
+            editingBillId = null;
+            inpBillNo.value = '';
+            inpChallan.value = '';
+            inpDate.value = new Date().toISOString().split('T')[0];
+            inpPartyName.value = '';
+            inpPartyDetails.value = '';
+            inpDiscount.value = 0;
+            if (inpDiscountAmount) inpDiscountAmount.value = '0.00';
+            chkPayment.checked = false;
+            paymentFields.classList.add('hidden');
+            inpAmtReceived.value = 0;
+            inpPayDate.value = '';
+            Array.from(editTableBody.children).forEach(tr => {
+                const inDesc = tr.children[1] ? (tr.children[1].querySelector('input') || tr.children[1].firstChild) : null;
+                const inQty  = tr.children[2] ? (tr.children[2].querySelector('input') || tr.children[2].firstChild) : null;
+                const inRate = tr.children[3] ? (tr.children[3].querySelector('input') || tr.children[3].firstChild) : null;
+                const inAmt  = tr.children[4] ? (tr.children[4].querySelector('input') || tr.children[4].firstChild) : null;
+                if (inDesc) inDesc.value = '';
+                if (inQty)  inQty.value = '';
+                if (inRate) inRate.value = '';
+                if (inAmt)  inAmt.value = '';
+            });
+            initRows(10);
+            recalcAll();
+            updatePreview();
+        }
+    });
+
+    // ========== PRINT ==========
+    btnPrint.addEventListener('click', () => {
+        updatePreview();
+        setTimeout(() => window.print(), 200);
+    });
+
+    // ========== PDF DOWNLOAD ==========
+    btnPdf.addEventListener('click', () => {
+        updatePreview();
+        const billEl = document.getElementById('billPreview');
+        if (typeof html2canvas === 'undefined' || typeof window === 'undefined' || !window.jspdf) {
+            showStatus('PDF library offline or loading. Please click Print Bill and select "Save as PDF".', 'error');
+            return;
+        }
+        showStatus('Generating PDF...', 'success');
+
+        html2canvas(billEl, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            width: 794,
+            windowWidth: 794
+        }).then(canvas => {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = 210;
+            const pageHeight = 297;
+            const imgWidth = pageWidth - 10; // 5mm margin each side
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            const imgData = canvas.toDataURL('image/png');
+
+            if (imgHeight <= pageHeight - 10) {
+                pdf.addImage(imgData, 'PNG', 5, 5, imgWidth, imgHeight);
+            } else {
+                // Multi-page
+                let yOffset = 0;
+                const pageContentHeight = pageHeight - 10;
+                while (yOffset < imgHeight) {
+                    if (yOffset > 0) pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 5, 5 - yOffset, imgWidth, imgHeight);
+                    yOffset += pageContentHeight;
+                }
+            }
+
+            const filename = 'Bill_' + (inpBillNo.value || 'Untitled') + '.pdf';
+            pdf.save(filename);
+            showStatus('PDF downloaded: ' + filename, 'success');
+        }).catch(err => {
+            showStatus('PDF generation failed: ' + err.message, 'error');
+        });
+    });
+
+    // ========== BILL HISTORY ==========
+    function renderHistory() {
+        const bills = loadBills();
+        const container = $('historyList');
+        const search = ($('historySearch').value || '').toLowerCase();
+        const filterVal = document.querySelector('.filter-btns .btn-sm.active')?.dataset.filter || 'all';
+
+        // Group by party
+        const groups = {};
+        bills.forEach(bill => {
+            if (!bill) return;
+            // Search filter
+            const pName = bill.partyName || '';
+            const bNum = bill.billNumber || '';
+            const cNum = bill.challanNumber || '';
+            const searchStr = (pName + ' ' + bNum + ' ' + cNum).toLowerCase();
+            if (search && !searchStr.includes(search)) return;
+
+            // Status filter
+            const status = getBillStatus(bill);
+            if (filterVal !== 'all' && status !== filterVal) return;
+
+            const party = pName || 'Unknown';
+            if (!groups[party]) groups[party] = [];
+            groups[party].push(bill);
+        });
+
+        container.innerHTML = '';
+        const sortedParties = Object.keys(groups).sort();
+
+        if (sortedParties.length === 0) {
+            container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">No bills found.</p>';
+            return;
+        }
+
+        sortedParties.forEach(party => {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'history-party-group';
+
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'history-party-name';
+            nameDiv.textContent = party;
+            groupDiv.appendChild(nameDiv);
+
+            // Sort bills by date descending
+            groups[party].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+            groups[party].forEach(bill => {
+                const status = getBillStatus(bill);
+                const isPaid = (status === 'paid');
+                const isPartial = (status === 'partial');
+                const remaining = Math.max(0, (bill.grandTotal || 0) - (bill.amountReceived || 0));
+
+                const card = document.createElement('div');
+                card.className = 'history-bill-card';
+                card.innerHTML = `
+                    <div class="bill-field"><strong>Bill:</strong> ${esc(bill.billNumber)}</div>
+                    <div class="bill-field"><strong>Party:</strong> ${esc(bill.partyName)}</div>
+                    <div class="bill-field"><strong>Challan:</strong> ${esc(bill.challanNumber)}</div>
+                    <div class="bill-field"><strong>Date:</strong> ${formatDateDisplay(bill.date)}</div>
+                    <div class="bill-field"><strong>Grand Total:</strong> ₹${formatIndianNumber(bill.grandTotal || 0)}</div>
+                    <div class="bill-field"><strong>Received:</strong> ₹${formatIndianNumber(bill.amountReceived || 0)}</div>
+                    <div class="bill-field"><strong>Pending:</strong> ₹${formatIndianNumber(remaining)}</div>
+                    <div class="bill-field">
+                        <span class="status-badge status-${status}">${isPartial ? 'Partially Paid' : (isPaid ? 'Paid' : 'Pending')}</span>
+                    </div>
+                    <div class="bill-field">
+                        <label class="bill-status-check is-${status}" title="Toggle payment status">
+                            <input type="checkbox" class="chk-bill-status" data-id="${bill.id}" ${isPaid ? 'checked' : ''} />
+                            <span>${isPaid ? '☑ Paid' : (isPartial ? '☐ Partially Paid' : '☐ Pending')}</span>
+                        </label>
+                    </div>
+                    <div class="bill-actions">
+                        <button class="btn btn-sm" data-action="view" data-id="${bill.id}">View</button>
+                        <button class="btn btn-sm" data-action="edit" data-id="${bill.id}">Edit</button>
+                        <button class="btn btn-sm" data-action="print" data-id="${bill.id}">Print</button>
+                        <button class="btn btn-sm" data-action="pay" data-id="${bill.id}">Payment</button>
+                        <button class="btn btn-sm" data-action="delete" data-id="${bill.id}" style="color:#c00">Delete</button>
+                    </div>
+                `;
+                groupDiv.appendChild(card);
+            });
+
+            container.appendChild(groupDiv);
+        });
+
+        // Attach action handlers
+        container.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                const id = btn.dataset.id;
+                if (action === 'view') viewBill(id);
+                if (action === 'edit') editBill(id);
+                if (action === 'print') printOldBill(id);
+                if (action === 'delete') deleteBill(id);
+                if (action === 'pay') recordPayment(id);
+            });
+        });
+
+        // Attach checkbox payment toggle handlers
+        container.querySelectorAll('.chk-bill-status').forEach(chk => {
+            chk.addEventListener('change', async (e) => {
+                const id = chk.dataset.id;
+                const bills = loadBills();
+                const idx = bills.findIndex(b => b.id === id);
+                if (idx === -1) return;
+                const bill = bills[idx];
+                const prevStatus = getBillStatus(bill);
+                const willBeChecked = chk.checked;
+
+                // Disable during confirmation to prevent duplicate triggers
+                chk.disabled = true;
+
+                if (willBeChecked) {
+                    // Marking as Paid
+                    const grand = parseFloat(bill.grandTotal) || 0;
+                    const received = parseFloat(bill.amountReceived) || 0;
+                    const remaining = Math.max(0, grand - received);
+
+                    if (prevStatus === 'partial') {
+                        const ok = confirm(`Bill ${bill.billNumber} (${bill.partyName}) has a partial payment.\nPaid: ₹${formatIndianNumber(received)}\nRemaining Pending: ₹${formatIndianNumber(remaining)}\n\nMark remaining balance of ₹${formatIndianNumber(remaining)} as fully PAID?`);
+                        if (!ok) {
+                            chk.checked = false;
+                            chk.disabled = false;
+                            return;
+                        }
+                    } else {
+                        const ok = confirm(`Mark Bill ${bill.billNumber} (${bill.partyName}) for ₹${formatIndianNumber(grand)} as fully PAID?`);
+                        if (!ok) {
+                            chk.checked = false;
+                            chk.disabled = false;
+                            return;
+                        }
+                    }
+
+                    bill.amountReceived = grand;
+                    bill.pendingAmount = 0;
+                    bill.paymentStatus = 'paid';
+                    bill.paymentReceived = true;
+                    bill.paymentDate = new Date().toISOString().split('T')[0];
+                } else {
+                    // Marking as Pending
+                    const grand = parseFloat(bill.grandTotal) || 0;
+                    const ok = confirm(`Change Bill ${bill.billNumber} (${bill.partyName}) status from Paid to PENDING?\n\nThis will restore the outstanding balance of ₹${formatIndianNumber(grand)}.`);
+                    if (!ok) {
+                        chk.checked = true;
+                        chk.disabled = false;
+                        return;
+                    }
+
+                    bill.amountReceived = 0;
+                    bill.pendingAmount = grand;
+                    bill.paymentStatus = 'pending';
+                    bill.paymentReceived = false;
+                    bill.paymentDate = '';
+                }
+
+                bills[idx] = bill;
+                saveBillsToStorage(bills);
+
+                if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+                    try {
+                        await window.CloudDB.saveBill(bill);
+                    } catch (err) {
+                        console.error('Firebase sync error on status change:', err);
+                    }
+                }
+
+                renderHistory();
+                renderPending();
+                if (typeof renderDashboard === 'function') renderDashboard();
+            });
+        });
+    }
+
+    // Search handler for history
+    $('historySearch').addEventListener('input', renderHistory);
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btns .btn-sm').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btns .btn-sm').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderHistory();
+        });
+    });
+
+    function getBillStatus(bill) {
+        const grand = bill.grandTotal || 0;
+        const received = bill.amountReceived || 0;
+        if (grand <= 0) return 'paid';
+        if (received >= grand) return 'paid';
+        if (received > 0) return 'partial';
+        return 'pending';
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // ========== VIEW BILL ==========
+    function viewBill(id) {
+        const bills = loadBills();
+        const bill = bills.find(b => b.id === id);
+        if (!bill) return alert('Bill not found.');
+        populateForm(bill);
+        // Switch to bill page
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        $('page-bill').classList.add('active');
+        document.querySelector('[data-page="bill"]').classList.add('active');
+        window.scrollTo(0, 0);
+    }
+
+    // ========== EDIT BILL ==========
+    function editBill(id) {
+        const bills = loadBills();
+        const bill = bills.find(b => b.id === id);
+        if (!bill) return alert('Bill not found.');
+        editingBillId = id;
+        populateForm(bill);
+        // Switch to bill page
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        $('page-bill').classList.add('active');
+        document.querySelector('[data-page="bill"]').classList.add('active');
+        showStatus('Editing bill ' + bill.billNumber + '. Click Save to update.', 'success');
+        window.scrollTo(0, 0);
+    }
+
+    // ========== PRINT OLD BILL ==========
+    function printOldBill(id) {
+        const bills = loadBills();
+        const bill = bills.find(b => b.id === id);
+        if (!bill) return alert('Bill not found.');
+        populateForm(bill);
+        updatePreview();
+        setTimeout(() => window.print(), 250);
+    }
+
+    // ========== DELETE BILL ==========
+    function deleteBill(id) {
+        if (!confirm('Are you sure you want to delete this bill? This cannot be undone.')) return;
+        let bills = loadBills();
+        bills = bills.filter(b => b.id !== id);
+        saveBillsToStorage(bills);
+        renderHistory();
+        renderPending();
+        if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+            window.CloudDB.deleteBill(id);
+        }
+    }
+
+    // ========== RECORD PAYMENT ==========
+    function recordPayment(id) {
+        const bills = loadBills();
+        const bill = bills.find(b => b.id === id);
+        if (!bill) return alert('Bill not found.');
+
+        const pending = (bill.grandTotal || 0) - (bill.amountReceived || 0);
+        if (pending <= 0) return alert('This bill is already fully paid.');
+
+        const amtStr = prompt('Pending: ₹' + formatIndianNumber(pending) + '\n\nEnter payment amount (₹):');
+        if (amtStr === null) return;
+        const amt = parseFloat(amtStr);
+        if (isNaN(amt) || amt <= 0) return alert('Please enter a valid amount.');
+        if (amt > pending) return alert('Payment cannot exceed pending amount ₹' + formatIndianNumber(pending));
+
+        const payDate = prompt('Enter payment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+        if (!payDate) return;
+
+        // Record payment
+        bill.amountReceived = (bill.amountReceived || 0) + amt;
+        bill.pendingAmount = Math.max(0, bill.grandTotal - bill.amountReceived);
+        bill.paymentReceived = bill.amountReceived > 0;
+        bill.paymentStatus = getBillStatus(bill);
+        bill.paymentDate = payDate;
+
+        // Add to payment history
+        if (!bill.payments) bill.payments = [];
+        bill.payments.push({ amount: amt, date: payDate, recordedAt: new Date().toISOString() });
+
+        const idx = bills.findIndex(b => b.id === id);
+        bills[idx] = bill;
+        saveBillsToStorage(bills);
+        renderHistory();
+        renderPending(); // update pending payment report automatically!
+        if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+            window.CloudDB.saveBill(bill);
+        }
+        alert('Payment of ₹' + formatIndianNumber(amt) + ' recorded successfully.');
+    }
+
+    // ========== POPULATE FORM ==========
+    function populateForm(bill) {
+        inpBillNo.value = bill.billNumber || '';
+        inpChallan.value = bill.challanNumber || '';
+        inpDate.value = bill.date || '';
+        inpPartyName.value = bill.partyName || '';
+        inpPartyDetails.value = bill.partyDetails || '';
+
+        // Items
+        editTableBody.innerHTML = '';
+        const items = bill.items || [];
+        const rowCount = Math.max(items.length, 10);
+        for (let i = 0; i < rowCount; i++) {
+            const data = i < items.length ? items[i] : {};
+            editTableBody.appendChild(createEditRow(data));
+        }
+        renumberRows();
+
+        const pct = bill.discountPercent !== undefined ? bill.discountPercent : ((bill.subtotal > 0 && bill.discount) ? Number(((bill.discount / bill.subtotal) * 100).toFixed(2)) : 0);
+        inpDiscount.value = pct;
+
+        chkPayment.checked = bill.paymentReceived || false;
+        paymentFields.classList.toggle('hidden', !chkPayment.checked);
+        inpAmtReceived.value = bill.amountReceived || 0;
+        inpPayDate.value = bill.paymentDate || '';
+
+        recalcAll();
+    }
+
+    // ========== PENDING PAYMENTS ==========
+    const selectParty = $('selectParty');
+    const pendingReportPartyName = $('pendingReportPartyName');
+    const pendingReportContent = $('pendingReportContent');
+    const overallPendingBanner = $('overallPendingBanner');
+    const pendingBannerLabel = $('pendingBannerLabel');
+    const overallPendingAmount = $('overallPendingAmount');
+    const btnGeneratePartyReport = $('btn-generatePartyReport');
+    const btnSavePartyReport = $('btn-savePartyReport');
+    const btnPartyPdf = $('btn-partyPdf');
+    const btnPartyPrint = $('btn-partyPrint');
+
+    function populatePartyDropdown() {
+        if (!selectParty) return;
+        const bills = loadBills();
+        const currentVal = selectParty.value;
+        const parties = new Set();
+        bills.forEach(b => {
+            const p = (b.partyName || '').trim();
+            if (p) parties.add(p);
+        });
+        const sortedParties = Array.from(parties).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+        selectParty.innerHTML = '<option value="">-- SELECT PARTY NAME --</option>';
+        sortedParties.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            if (p === currentVal) opt.selected = true;
+            selectParty.appendChild(opt);
+        });
+
+        if (sortedParties.length > 0) {
+            const allOpt = document.createElement('option');
+            allOpt.value = '__ALL__';
+            allOpt.textContent = '-- ALL PARTIES (Summary) --';
+            if (currentVal === '__ALL__') allOpt.selected = true;
+            selectParty.appendChild(allOpt);
+        }
+    }
+
+    function renderPending() {
+        populatePartyDropdown();
+        const bills = loadBills();
+        const selectedParty = (selectParty ? selectParty.value : '').trim();
+        const challanFilter = ($('pendingSearch') ? $('pendingSearch').value : '').trim().toLowerCase();
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        if ($('pendingReportDate')) {
+            $('pendingReportDate').textContent = 'Generated on: ' + formatDateDisplay(todayStr);
+        }
+
+        const container = $('pendingReportContent');
+        if (!container) return;
+        container.innerHTML = '';
+
+        // If no party selected yet
+        if (!selectedParty) {
+            if (pendingReportPartyName) {
+                pendingReportPartyName.textContent = 'Party Name: [Please Select a Party]';
+                pendingReportPartyName.style.display = 'block';
+            }
+            container.innerHTML = `<div style="text-align:center;padding:40px 20px;color:#888;font-size:15px;font-weight:600;">
+                Please select a Party Name from the dropdown above to generate the pending payment report.
+            </div>`;
+            if (overallPendingBanner) overallPendingBanner.style.display = 'none';
+            return;
+        }
+
+        // Case 1: Specific Selected Party (e.g. Hanuman or Shree Ram)
+        if (selectedParty !== '__ALL__') {
+            if (pendingReportPartyName) {
+                pendingReportPartyName.textContent = 'Party Name: ' + selectedParty;
+                pendingReportPartyName.style.display = 'block';
+            }
+
+            const partyBills = bills.filter(b => {
+                const p = (b.partyName || '').trim();
+                return p.toLowerCase() === selectedParty.toLowerCase();
+            });
+
+            // Filter pending bills (> 0.001)
+            const seenDocIds = new Set();
+            const pendingItems = [];
+            let partyTotal = 0;
+
+            partyBills.forEach(bill => {
+                const grand = parseFloat(bill.grandTotal) || 0;
+                const received = parseFloat(bill.amountReceived) || 0;
+                // Important calculation: Pending Amount = Final Bill Grand Total − Amount Received.
+                // The grand total already includes the discount. Never subtract the discount again.
+                const pendingAmt = Math.max(0, grand - received);
+
+                if (pendingAmt <= 0.001) return; // exclude fully paid bills
+
+                const challanStr = (bill.challanNumber || '').trim();
+                if (challanFilter && !challanStr.toLowerCase().includes(challanFilter)) return;
+
+                const docId = bill.id || (bill.billNumber ? 'bill_' + bill.billNumber : 'doc_' + Math.random());
+                if (seenDocIds.has(docId)) return;
+                seenDocIds.add(docId);
+
+                let statusText = 'Pending';
+                if (received > 0 && received < grand) statusText = 'Partially Paid';
+
+                pendingItems.push({
+                    challanNumber: challanStr || '--',
+                    billNumber: bill.billNumber || '',
+                    date: bill.date || '',
+                    pendingAmount: pendingAmt,
+                    status: statusText
+                });
+
+                partyTotal += pendingAmt;
+            });
+
+            if (pendingItems.length === 0) {
+                container.innerHTML = `<div style="text-align:center;padding:40px 20px;color:#155724;background:#d4edda;border-radius:4px;font-size:15px;font-weight:700;margin:15px 0;">
+                    No pending payments for "${esc(selectedParty)}". All bills are fully paid!
+                </div>`;
+                if (overallPendingBanner) overallPendingBanner.style.display = 'none';
+                return;
+            }
+
+            // Sort newest date first
+            pendingItems.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+            // Build 3-column Table:
+            // 1. Party Challan No. | 2. Total Pending (₹) | 3. Status
+            const table = document.createElement('table');
+            table.className = 'pending-table';
+            let html = `<thead>
+                <tr>
+                    <th style="width:40%;text-align:left;">Party Challan No.</th>
+                    <th style="width:35%;text-align:right;">Total Pending (₹)</th>
+                    <th style="width:25%;text-align:center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+            pendingItems.forEach(item => {
+                const statusClass = item.status === 'Partially Paid' ? 'partial' : 'pending';
+                html += `<tr>
+                    <td style="font-weight:600;text-align:left;">${esc(item.challanNumber)}</td>
+                    <td style="text-align:right;font-weight:700;color:#8b0000;">₹${formatIndianNumber(item.pendingAmount)}</td>
+                    <td style="text-align:center;"><span class="status-badge status-${statusClass}">${item.status}</span></td>
+                </tr>`;
+            });
+
+            html += `<tr class="party-total-row">
+                <td style="font-weight:800;letter-spacing:0.5px;text-align:left;">Party Total</td>
+                <td style="text-align:right;font-weight:800;color:#8b0000;font-size:14px;">₹${formatIndianNumber(partyTotal)}</td>
+                <td></td>
+            </tr>
+            </tbody>`;
+
+            table.innerHTML = html;
+            container.appendChild(table);
+
+            if (overallPendingBanner) {
+                if (pendingBannerLabel) pendingBannerLabel.textContent = 'PARTY TOTAL PENDING:';
+                if (overallPendingAmount) overallPendingAmount.textContent = '₹' + formatIndianNumber(partyTotal);
+                overallPendingBanner.style.display = 'flex';
+            }
+            return;
+        }
+
+        // Case 2: ALL PARTIES Summary
+        if (selectedParty === '__ALL__') {
+            if (pendingReportPartyName) {
+                pendingReportPartyName.textContent = 'Party Name: All Parties (Combined Summary)';
+                pendingReportPartyName.style.display = 'block';
+            }
+
+            const groups = {};
+            let overallTotal = 0;
+            const seenDocIds = new Set();
+
+            bills.forEach(bill => {
+                const grand = parseFloat(bill.grandTotal) || 0;
+                const received = parseFloat(bill.amountReceived) || 0;
+                const pendingAmt = Math.max(0, grand - received);
+
+                if (pendingAmt <= 0.001) return;
+
+                const partyStr = (bill.partyName || '').trim() || '[MISSING PARTY NAME]';
+                const challanStr = (bill.challanNumber || '').trim();
+                if (challanFilter && !challanStr.toLowerCase().includes(challanFilter)) return;
+
+                const docId = bill.id || (bill.billNumber ? 'bill_' + bill.billNumber : 'doc_' + Math.random());
+                if (seenDocIds.has(docId)) return;
+                seenDocIds.add(docId);
+
+                if (!groups[partyStr]) {
+                    groups[partyStr] = {
+                        partyName: partyStr,
+                        bills: [],
+                        partyTotal: 0
+                    };
+                }
+
+                let statusText = 'Pending';
+                if (received > 0 && received < grand) statusText = 'Partially Paid';
+
+                groups[partyStr].bills.push({
+                    challanNumber: challanStr || '--',
+                    billNumber: bill.billNumber || '',
+                    date: bill.date || '',
+                    pendingAmount: pendingAmt,
+                    status: statusText
+                });
+
+                groups[partyStr].partyTotal += pendingAmt;
+                overallTotal += pendingAmt;
+            });
+
+            const sortedParties = Object.keys(groups).sort();
+            if (sortedParties.length === 0) {
+                container.innerHTML = `<div style="text-align:center;padding:40px 20px;color:#888;font-size:15px;font-weight:600;">
+                    No pending payments found across all parties. All bills are fully paid!
+                </div>`;
+                if (overallPendingBanner) overallPendingBanner.style.display = 'none';
+                return;
+            }
+
+            sortedParties.forEach(pKey => {
+                const grp = groups[pKey];
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'pending-party-group';
+
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'pending-party-header';
+                nameDiv.textContent = 'Party Name: ' + grp.partyName;
+                groupDiv.appendChild(nameDiv);
+
+                const table = document.createElement('table');
+                table.className = 'pending-table';
+                let html = `<thead>
+                    <tr>
+                        <th style="width:40%;text-align:left;">Party Challan No.</th>
+                        <th style="width:35%;text-align:right;">Total Pending (₹)</th>
+                        <th style="width:25%;text-align:center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+                grp.bills.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                grp.bills.forEach(item => {
+                    const statusClass = item.status === 'Partially Paid' ? 'partial' : 'pending';
+                    html += `<tr>
+                        <td style="font-weight:600;text-align:left;">${esc(item.challanNumber)}</td>
+                        <td style="text-align:right;font-weight:700;color:#8b0000;">₹${formatIndianNumber(item.pendingAmount)}</td>
+                        <td style="text-align:center;"><span class="status-badge status-${statusClass}">${item.status}</span></td>
+                    </tr>`;
+                });
+
+                html += `<tr class="party-total-row">
+                    <td style="font-weight:800;letter-spacing:0.5px;text-align:left;">Party Total</td>
+                    <td style="text-align:right;font-weight:800;color:#8b0000;font-size:14px;">₹${formatIndianNumber(grp.partyTotal)}</td>
+                    <td></td>
+                </tr>
+                </tbody>`;
+
+                table.innerHTML = html;
+                groupDiv.appendChild(table);
+                container.appendChild(groupDiv);
+            });
+
+            if (overallPendingBanner) {
+                if (pendingBannerLabel) pendingBannerLabel.textContent = 'OVERALL TOTAL PENDING:';
+                if (overallPendingAmount) overallPendingAmount.textContent = '₹' + formatIndianNumber(overallTotal);
+                overallPendingBanner.style.display = 'flex';
+            }
+        }
+    }
+
+    if (selectParty) selectParty.addEventListener('change', renderPending);
+    if ($('pendingSearch')) $('pendingSearch').addEventListener('input', renderPending);
+    if (btnGeneratePartyReport) btnGeneratePartyReport.addEventListener('click', renderPending);
+
+    // ========== SAVE PARTY PENDING REPORT ==========
+    if (btnSavePartyReport) {
+        btnSavePartyReport.addEventListener('click', async () => {
+            const selectedParty = (selectParty ? selectParty.value : '').trim();
+            if (!selectedParty) {
+                showPendingStatus('Please select a Party Name first.', 'error');
+                return;
+            }
+
+            const bills = loadBills();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            if (selectedParty !== '__ALL__') {
+                const partyBills = bills.filter(b => ((b.partyName || '').trim().toLowerCase() === selectedParty.toLowerCase()));
+                const seenDocIds = new Set();
+                const pendingItems = [];
+                let partyTotal = 0;
+
+                partyBills.forEach(bill => {
+                    const grand = parseFloat(bill.grandTotal) || 0;
+                    const received = parseFloat(bill.amountReceived) || 0;
+                    const pendingAmt = Math.max(0, grand - received);
+
+                    if (pendingAmt <= 0.001) return;
+
+                    const docId = bill.id || (bill.billNumber ? 'bill_' + bill.billNumber : 'doc_' + Math.random());
+                    if (seenDocIds.has(docId)) return;
+                    seenDocIds.add(docId);
+
+                    let statusText = 'Pending';
+                    if (received > 0 && received < grand) statusText = 'Partially Paid';
+
+                    pendingItems.push({
+                        challanNumber: bill.challanNumber || '--',
+                        billNumber: bill.billNumber || '',
+                        date: bill.date || '',
+                        pendingAmount: pendingAmt,
+                        status: statusText
+                    });
+
+                    partyTotal += pendingAmt;
+                });
+
+                if (pendingItems.length === 0) {
+                    showPendingStatus('No pending balance to save for "' + selectedParty + '".', 'error');
+                    return;
+                }
+
+                const reportSnapshot = {
+                    id: 'party_report_' + Date.now(),
+                    reportTitle: 'PENDING PAYMENT REPORT',
+                    businessName: 'AKSHAR ARI WORK',
+                    partyName: selectedParty,
+                    generatedDate: todayStr,
+                    totalPendingAmount: partyTotal,
+                    bills: pendingItems,
+                    savedAt: new Date().toISOString()
+                };
+
+                // Save snapshot locally
+                try {
+                    const existingRaw = localStorage.getItem('akshar_ari_party_pending_reports_v2');
+                    const reports = existingRaw ? JSON.parse(existingRaw) : [];
+                    reports.push(reportSnapshot);
+                    localStorage.setItem('akshar_ari_party_pending_reports_v2', JSON.stringify(reports));
+                } catch (e) {
+                    console.error('Error saving local party report snapshot:', e);
+                }
+
+                // Sync to Firestore if configured
+                if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+                    await window.CloudDB.savePartyPendingReport(reportSnapshot);
+                }
+
+                showPendingStatus('Party Pending Report for "' + selectedParty + '" saved successfully! (Total Pending: ₹' + formatIndianNumber(partyTotal) + ')', 'success');
+            } else {
+                showPendingStatus('Please select a specific Party Name to save an individual party report.', 'error');
+            }
+        });
+    }
+
+    // ========== DOWNLOAD PARTY PENDING PDF ==========
+    if (btnPartyPdf) {
+        btnPartyPdf.addEventListener('click', () => {
+            const selectedParty = (selectParty ? selectParty.value : '').trim();
+            if (!selectedParty) {
+                showPendingStatus('Please select a Party Name first.', 'error');
+                return;
+            }
+
+            const reportEl = document.getElementById('pendingReportPreview');
+            if (!reportEl) return;
+            if (typeof html2canvas === 'undefined' || typeof window === 'undefined' || !window.jspdf) {
+                showPendingStatus('PDF library offline or loading. Please click Print Report and select "Save as PDF".', 'error');
+                return;
+            }
+            showPendingStatus('Generating Party Pending Report PDF...', 'success');
+
+            html2canvas(reportEl, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: 794,
+                windowWidth: 794
+            }).then(canvas => {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = 210;
+                const pageHeight = 297;
+                const margin = 5;
+                const imgWidth = pageWidth - (margin * 2);
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                const imgData = canvas.toDataURL('image/png');
+
+                if (imgHeight <= pageHeight - (margin * 2)) {
+                    pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+                } else {
+                    let yOffset = 0;
+                    const pageContentHeight = pageHeight - (margin * 2);
+                    while (yOffset < imgHeight) {
+                        if (yOffset > 0) pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', margin, margin - yOffset, imgWidth, imgHeight);
+                        yOffset += pageContentHeight;
+                    }
+                }
+
+                const dateStr = new Date().toISOString().split('T')[0];
+                const cleanParty = selectedParty.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const filename = 'Pending_Report_' + cleanParty + '_' + dateStr + '.pdf';
+                pdf.save(filename);
+                showPendingStatus('Party Pending Report PDF downloaded: ' + filename, 'success');
+            }).catch(err => {
+                showPendingStatus('PDF generation failed: ' + err.message, 'error');
+            });
+        });
+    }
+
+    // ========== PRINT PARTY PENDING REPORT ==========
+    if (btnPartyPrint) {
+        btnPartyPrint.addEventListener('click', () => {
+            const selectedParty = (selectParty ? selectParty.value : '').trim();
+            if (!selectedParty) {
+                showPendingStatus('Please select a Party Name first before printing.', 'error');
+                return;
+            }
+            window.print();
+        });
+    }
+
+    function showPendingStatus(msg, type) {
+        const el = $('pendingStatusMsg');
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'status-msg ' + type;
+        setTimeout(() => { el.className = 'status-msg'; }, 4000);
+    }
+
+    // ========== DASHBOARD ==========
+    function renderDashboard() {
+        const bills = loadBills();
+
+        let totalBills = bills.length;
+        let totalBilling = 0;
+        let totalReceived = 0;
+        let totalPending = 0;
+        let pendingCount = 0;
+        let paidCount = 0;
+
+        const partyMap = {};
+
+        bills.forEach(bill => {
+            if (!bill) return;
+            const grand = bill.grandTotal || 0;
+            const received = bill.amountReceived || 0;
+            const pending = Math.max(0, grand - received);
+
+            totalBilling += grand;
+            totalReceived += received;
+            totalPending += pending;
+
+            const status = getBillStatus(bill);
+            if (status === 'paid') paidCount++;
+            else pendingCount++;
+
+            const party = bill.partyName || 'Unknown';
+            if (!partyMap[party]) partyMap[party] = { billing: 0, received: 0, pending: 0 };
+            partyMap[party].billing += grand;
+            partyMap[party].received += received;
+            partyMap[party].pending += pending;
+        });
+
+        $('dashboardCards').innerHTML = `
+            <div class="dash-card"><span class="dash-value">${totalBills}</span><span class="dash-label">Total Bills</span></div>
+            <div class="dash-card"><span class="dash-value">₹${formatIndianNumber(totalBilling)}</span><span class="dash-label">Total Billing</span></div>
+            <div class="dash-card"><span class="dash-value">₹${formatIndianNumber(totalReceived)}</span><span class="dash-label">Total Received</span></div>
+            <div class="dash-card"><span class="dash-value">₹${formatIndianNumber(totalPending)}</span><span class="dash-label">Total Pending</span></div>
+            <div class="dash-card"><span class="dash-value">${pendingCount}</span><span class="dash-label">Pending Bills</span></div>
+            <div class="dash-card"><span class="dash-value">${paidCount}</span><span class="dash-label">Fully Paid Bills</span></div>
+        `;
+
+        const sortedParties = Object.keys(partyMap).sort();
+        let tableHtml = `<table class="party-summary-table">
+            <thead><tr><th>Party Name</th><th>Total Billing (₹)</th><th>Total Received (₹)</th><th>Total Pending (₹)</th></tr></thead>
+            <tbody>`;
+        sortedParties.forEach(party => {
+            const p = partyMap[party];
+            tableHtml += `<tr>
+                <td>${esc(party)}</td>
+                <td>₹${formatIndianNumber(p.billing)}</td>
+                <td>₹${formatIndianNumber(p.received)}</td>
+                <td>₹${formatIndianNumber(p.pending)}</td>
+            </tr>`;
+        });
+        tableHtml += '</tbody></table>';
+        $('partySummary').innerHTML = sortedParties.length ? tableHtml : '<p style="color:#999;text-align:center;">No data yet.</p>';
+    }
+
+    // ========== CLOUD SYNC & STATUS ==========
+    function updateSyncStatus(state, label) {
+        const badge = $('navSyncBadge');
+        const txt = $('syncText');
+        if (!badge || !txt) return;
+        badge.className = 'nav-sync-indicator ' + (state || '');
+        txt.textContent = label || '';
+    }
+
+    async function refreshBillsFromCloud() {
+        if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+            updateSyncStatus('syncing', 'Syncing Cloud...');
+            try {
+                const cloudBills = await window.CloudDB.getBills();
+                if (cloudBills && Array.isArray(cloudBills)) {
+                    const localBills = loadBills();
+                    const mergedMap = new Map();
+                    localBills.forEach(b => {
+                        const k = b.id || (b.billNumber ? 'bill_' + b.billNumber : null);
+                        if (k) mergedMap.set(k, b);
+                    });
+                    cloudBills.forEach(b => {
+                        const k = b.id || (b.billNumber ? 'bill_' + b.billNumber : null);
+                        if (k) mergedMap.set(k, b);
+                    });
+                    const finalBills = Array.from(mergedMap.values());
+                    saveBillsToStorage(finalBills);
+                    updateSyncStatus('cloud', '☁️ Cloud Synced');
+                    renderHistory();
+                    renderPending();
+                    if (typeof renderDashboard === 'function') renderDashboard();
+                    return finalBills;
+                }
+            } catch (err) {
+                console.warn('Error fetching cloud bills:', err);
+                updateSyncStatus('offline', '💾 Local Mode (Offline)');
+            }
+        } else {
+            updateSyncStatus('offline', '💾 Local Mode');
+        }
+        return loadBills();
+    }
+
+    // Refresh Cloud History button
+    const btnRefreshHistory = $('btn-refreshCloudHistory');
+    if (btnRefreshHistory) {
+        btnRefreshHistory.addEventListener('click', async () => {
+            btnRefreshHistory.disabled = true;
+            const originalHtml = btnRefreshHistory.innerHTML;
+            btnRefreshHistory.innerHTML = '⏳ Refreshing...';
+            try {
+                await refreshBillsFromCloud();
+                showStatus('Cloud history refreshed successfully!', 'success');
+            } catch (err) {
+                console.error(err);
+                showStatus('Cloud refresh failed: ' + (err.message || 'Offline'), 'error');
+            } finally {
+                btnRefreshHistory.disabled = false;
+                btnRefreshHistory.innerHTML = originalHtml;
+            }
+        });
+    }
+
+    // ========== INITIAL LOAD & CLOUD SYNC ==========
+    updatePreview();
+    renderPending();
+    renderHistory();
+
+    function initCloudSync() {
+        if (typeof window !== 'undefined' && window.CloudDB && window.CloudDB.isConfigured()) {
+            updateSyncStatus('cloud', '☁️ Cloud Synced');
+            
+            // Listen for multi-device real-time updates
+            window.CloudDB.onBillsChanged(cloudBills => {
+                if (cloudBills && Array.isArray(cloudBills)) {
+                    saveBillsToStorage(cloudBills);
+                    updateSyncStatus('cloud', '☁️ Cloud Synced');
+                    renderPending();
+                    renderHistory();
+                    if ($('page-dashboard') && $('page-dashboard').classList.contains('active')) {
+                        renderDashboard();
+                    }
+                }
+            });
+
+            // Refresh from cloud on boot
+            refreshBillsFromCloud();
+        } else {
+            updateSyncStatus('offline', '💾 Local Mode');
+        }
+    }
+
+    initCloudSync();
 }
 
-// Expose functions globally for inline HTML onclick attributes
-window.generateBill = generateBill;
-window.saveAsPDF = saveAsPDF;
-window.printBill = printBill;
-window.switchTab = switchTab;
-window.handleNewBill = handleNewBill;
-window.handleClear = handleClear;
-window.viewHistoryBill = viewHistoryBill;
-window.editHistoryBill = editHistoryBill;
-window.deleteHistoryBill = deleteHistoryBill;
-window.closeDeleteModal = closeDeleteModal;
-window.confirmDeleteBill = confirmDeleteBill;
-window.handleClearAllHistory = handleClearAllHistory;
-window.clearHistorySearch = clearHistorySearch;
-window.togglePartyGroup = togglePartyGroup;
-window.expandAllPartyGroups = expandAllPartyGroups;
-window.collapseAllPartyGroups = collapseAllPartyGroups;
-window.openAuthModal = openAuthModal;
-window.closeAuthModal = closeAuthModal;
-window.toggleAuthMode = toggleAuthMode;
-window.togglePasswordVisibility = togglePasswordVisibility;
-window.handleAuthSubmit = handleAuthSubmit;
-window.openAccountModal = openAccountModal;
-window.closeAccountModal = closeAccountModal;
-window.handleCloudStatusClick = handleCloudStatusClick;
-window.handleLogout = handleLogout;
-window.cancelEditMode = cancelEditMode;
-window.promptMigrateLocalHistory = promptMigrateLocalHistory;
-window.closeMigrateModal = closeMigrateModal;
-window.executeLocalMigration = executeLocalMigration;
-window.refreshHistoryFromCloud = refreshHistoryFromCloud;
-
-/**
- * Initialize Application on DOM Ready
- */
-document.addEventListener('DOMContentLoaded', () => {
-  // 1. Attach static DOM event listeners
-  setupEventListeners();
-
-  // 2. Load draft from localStorage or calculate initial state
-  loadDraftFromStorage();
-
-  // 3. Initialize Firebase Auth and Cloud Firestore
-  initFirebaseSystem();
-
-  // 4. Default view: Show requested hash or Form (1. ENTER BILL)
-  const initialHash = window.location.hash.replace('#', '');
-  if (initialHash === 'preview' || initialHash === 'history') {
-    switchTab(initialHash);
-  } else {
-    switchTab('editor');
-  }
-});
+// ========== INITIALIZATION ==========
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
+    }
+    // Also attach to DOMContentLoaded for test harnesses / delayed triggers
+    document.addEventListener('DOMContentLoaded', initApp);
+}

@@ -1,872 +1,1543 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>AKSHAR ARI WORK - Bill Generator</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>AKSHAR ARI WORK — Bill Generator</title>
+    <link rel="stylesheet" type="text/css" href="style.css" id="mainStylesheet" />
+    <style id="appCoreStyles">
+/* ============================================================
+   AKSHAR ARI WORK — Bill Generator V2  —  Desktop & Laptop Stylesheet
+   Exclusively Optimized for Laptop & Desktop Screens
+   Strictly Preserves Reference A4 Print & PDF Output
+   ============================================================ */
+
+/* ---------- 1. Reset & Global Foundations ---------- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    min-width: 1024px; /* Optimized strictly for laptops and desktops */
+    background: #f1f5f9;
+    color: #1e293b;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+h2, h3 {
+    color: #8b0000;
+}
+
+/* ---------- 2. Desktop Navigation Bar ---------- */
+#appNav {
+    background: #8b0000;
+    color: #fff;
+    padding: 12px 36px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    width: 100%;
+}
+
+.nav-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.nav-brand {
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #fff;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.nav-sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    cursor: default;
+    user-select: none;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.nav-sync-indicator .sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.nav-sync-indicator.offline .sync-dot {
+    background: #f59e0b;
+}
+
+.nav-sync-indicator.syncing .sync-dot {
+    background: #38bdf8;
+    animation: blinkSync 1s infinite alternate;
+}
+
+@keyframes blinkSync {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+}
+
+.nav-links {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: center;
+}
+
+.nav-link {
+    color: #fff;
+    text-decoration: none;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.12);
+    transition: background 0.2s ease, transform 0.1s ease;
+    white-space: nowrap;
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.nav-link.active {
+    background: #fff;
+    color: #8b0000;
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- 3. Desktop Page Containers ---------- */
+.page {
+    display: none;
+    width: 100%;
+    max-width: 1140px;
+    margin: 24px auto;
+    padding: 0 20px 40px 20px;
+}
+
+.page.active {
+    display: block;
+}
+
+/* ---------- 4. App Controls Desktop Card ---------- */
+.app-controls {
+    background: #fff;
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e2e8f0;
+    width: 100%;
+}
+
+.app-controls h2 {
+    color: #8b0000;
+    margin-bottom: 18px;
+    border-bottom: 2px solid #8b0000;
+    padding-bottom: 8px;
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+/* ---------- 5. Desktop Forms & Multi-Column Inputs ---------- */
+.form-row {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    margin-bottom: 14px;
+    width: 100%;
+    align-items: flex-start;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.form-group.col-span-2 {
+    flex: 2;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #374151;
+}
+
+.form-group input, 
+.form-group select, 
+.search-input {
+    width: 100%;
+    height: 38px;
+    padding: 6px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #fff;
+    color: #1e293b;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus, 
+.form-group select:focus, 
+.search-input:focus {
+    outline: none;
+    border-color: #8b0000;
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.12);
+}
+
+.search-input {
+    width: 100%;
+}
+
+#selectParty {
+    padding: 8px 12px;
+    border: 1.5px solid #8b0000;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    background: #fff;
+    width: 100%;
+    height: 40px;
+}
+
+.pending-filter-row {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+
+.party-select-group {
+    flex: 2;
+}
+
+.challan-search-group {
+    flex: 1;
+}
+
+/* ---------- 6. Editable Item Table (Desktop Full-Width) ---------- */
+.table-scroll {
+    width: 100%;
+    margin: 16px 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+}
+
+#editTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+#editTable th {
+    background: #8b0000;
+    color: #fff;
+    padding: 10px 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-align: center;
+    white-space: nowrap;
+    border: 1px solid #750000;
+}
+
+#editTable th.th-sr { width: 55px; }
+#editTable th.th-desc { text-align: left; }
+#editTable th.th-qty { width: 100px; }
+#editTable th.th-rate { width: 110px; }
+#editTable th.th-amt { width: 130px; }
+#editTable th.th-del { width: 45px; }
+
+#editTable td {
+    border: 1px solid #e2e8f0;
+    padding: 5px 6px;
+    vertical-align: middle;
+}
+
+#editTable td input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    padding: 6px 10px;
+    font-size: 13.5px;
+    height: 36px;
+    text-align: center;
+    border-radius: 4px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#editTable td input:focus {
+    outline: none;
+    border-color: #8b0000;
+    box-shadow: 0 0 0 2px rgba(139, 0, 0, 0.15);
+}
+
+#editTable td input.inp-item-desc,
+#editTable td:nth-child(2) input {
+    text-align: left;
+}
+
+#editTable td input.inp-item-qty,
+#editTable td:nth-child(3) input {
+    text-align: right;
+}
+
+#editTable td input.inp-item-rate,
+#editTable td:nth-child(4) input {
+    text-align: right;
+}
+
+#editTable td input[readonly],
+#editTable td input.inp-item-amt,
+#editTable td:nth-child(5) input {
+    text-align: right;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.td-sr-num {
+    text-align: center;
+    font-weight: 600;
+    color: #475569;
+    font-size: 13px;
+}
+
+.td-del-cell {
+    text-align: center;
+}
+
+.btn-del-row {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-del-row:hover {
+    background: #8b0000;
+    color: #ffffff;
+    border-color: #8b0000;
+}
+
+#editTable tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+#editTable tbody tr:nth-child(odd) {
+    background: #fff;
+}
+
+/* ---------- 7. Table Controls & Totals Area ---------- */
+.form-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+    margin: 16px 0;
+    flex-wrap: wrap;
+}
+
+.form-actions.table-actions {
+    margin: 8px 0 16px 0;
+}
+
+.btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-weight: 600;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-red { background: #8b0000; color: #fff; }
+.btn-blue { background: #0055aa; color: #fff; }
+.btn-green { background: #166534; color: #fff; }
+.btn-outline { background: #fff; color: #374151; border: 1px solid #cbd5e1; }
+.btn-outline:hover { background: #f8fafc; border-color: #94a3b8; }
+
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-sm.active {
+    background: #8b0000;
+    color: #fff;
+    border-color: #8b0000;
+}
+
+/* Desktop Totals Section */
+.totals-edit {
+    width: 380px;
+    margin-left: auto;
+    margin-bottom: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+
+.total-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.total-line:last-child {
+    border-bottom: none;
+}
+
+.total-line label {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: #374151;
+    flex: 1;
+}
+
+.total-line input {
+    text-align: right;
+    padding: 5px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    width: 140px;
+    font-size: 14px;
+    height: 34px;
+    background: #fff;
+}
+
+.total-line.grand {
+    background: #fff5f5;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-top: 6px;
+    border: 1.5px solid #8b0000;
+}
+
+.total-line.grand label {
+    color: #8b0000;
+    font-size: 0.95rem;
+    font-weight: 800;
+}
+
+.total-line.grand input {
+    font-weight: 800;
+    color: #8b0000;
+    font-size: 1.05rem;
+    border-color: #8b0000;
+}
+
+/* ---------- 8. Payment Controls ---------- */
+.payment-controls {
+    margin: 16px 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 14px 18px;
+}
+
+.chk-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #1e293b;
+}
+
+.chk-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #8b0000;
+}
+
+.payment-fields {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.payment-fields .form-group {
+    max-width: 260px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.status-msg {
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin-top: 14px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    display: none;
+    text-align: center;
+}
+
+.status-msg.success {
+    display: block;
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-msg.error {
+    display: block;
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* ---------- 9. Filter Buttons ---------- */
+.filter-btns {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+/* ---------- 10. Bill Preview (Exact Pixel-Perfect A4 Portrait) ---------- */
+.preview-section-title {
+    text-align: center;
+    margin-top: 30px;
+    margin-bottom: 12px;
+    color: #8b0000;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.preview-scroll-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.bill-preview {
+    width: 794px;        /* Exact A4 portrait width at 96 DPI */
+    min-width: 794px;
+    max-width: 794px;
+    background: #fff;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.bill-page {
+    width: 100%;
+    border: 2.5px solid #8b0000;
+    padding: 28px 32px 25px 32px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+/* Header */
+.bill-header { text-align: center; margin-bottom: 12px; }
+
+.bill-jay {
+    font-size: 16px;
+    font-weight: 700;
+    color: #8b0000;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-variant: small-caps;
+    padding: 8px 0 6px 0;
+    text-align: center;
+}
+
+.bill-red-line {
+    height: 2.5px;
+    background: #8b0000;
+    margin: 0 0 10px 0;
+}
+
+.bill-business-name {
+    text-align: center;
+    font-size: 36px;
+    font-weight: 900;
+    color: #8b0000;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    line-height: 1.1;
+    padding-bottom: 6px;
+}
+
+.bill-grey-line {
+    height: 1px;
+    background: #ccc;
+    margin-bottom: 14px;
+}
+
+/* Info Row */
+.bill-info-row {
+    display: flex;
+    border: 1px solid #ddd;
+    margin-bottom: 12px;
+    border-radius: 2px;
+}
+.bill-info-cell {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-right: 1px solid #ddd;
+}
+.bill-info-cell:last-child { border-right: none; }
+.info-label { font-weight: 700; color: #555; }
+
+/* Party Section */
+.bill-party-section {
+    border: 1px solid #e0e0e0;
+    border-left: 4px solid #8b0000;
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    min-height: 50px;
+}
+.party-heading {
+    font-size: 12px;
+    font-weight: 800;
+    color: #8b0000;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+.party-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+.party-details {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* Preview Items Table */
+.bill-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+.bill-table thead th {
+    background: #8b0000;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 6px;
+    text-align: center;
+    border: 1px solid #8b0000;
+}
+.bill-table .col-sr   { width: 55px; }
+.bill-table .col-desc { /* fills remaining space */ }
+.bill-table .col-qty  { width: 90px; }
+.bill-table .col-rate { width: 90px; }
+.bill-table .col-amt  { width: 110px; }
+
+.bill-table tbody td {
+    border: 1px solid #e0e0e0;
+    padding: 7px 8px;
+    font-size: 12px;
+    text-align: center;
+    min-height: 30px;
+    height: 30px;
+}
+.bill-table tbody td:nth-child(2) { text-align: left; }
+.bill-table tbody tr:nth-child(even) { background: #fafafa; }
+.bill-table tbody tr:nth-child(odd) { background: #fff; }
+
+/* Bottom Section */
+.bill-bottom {
+    display: flex;
+    gap: 0;
+    margin-top: 16px;
+    padding-top: 0;
+    align-items: stretch;
+}
+
+.bill-thankyou {
+    flex: 1;
+    background: #fff5f5;
+    border-left: 4px solid #8b0000;
+    padding: 14px 18px;
+    margin-right: 15px;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.thankyou-title {
+    font-size: 22px;
+    font-weight: 900;
+    color: #8b0000;
+    text-transform: uppercase;
+    font-variant: small-caps;
+    margin-bottom: 4px;
+}
+.thankyou-msg {
+    font-size: 13px;
+    color: #666;
+}
+
+.bill-totals {
+    width: 280px;
+    flex-shrink: 0;
+}
+.totals-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
+}
+.subtotal-row {
+    border: 1px solid #ddd;
+    background: #fff;
+}
+.discount-row {
+    border: 1px solid #ddd;
+    border-top: none;
+    background: #fff;
+}
+.grandtotal-row {
+    background: #8b0000;
+    color: #fff;
+}
+.totals-label {
+    font-size: 13px;
+    font-weight: 700;
+}
+.totals-value {
+    font-size: 13px;
+    font-weight: 700;
+    text-align: right;
+}
+.grandtotal-row .totals-label,
+.grandtotal-row .totals-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+}
+
+/* ---------- 11. History List ---------- */
+.history-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #8b0000;
+    padding-bottom: 8px;
+}
+.history-page-header h2 {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.history-list { margin-top: 10px; }
+.history-party-group { margin-bottom: 24px; }
+.history-party-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #8b0000;
+    padding: 8px 14px;
+    background: #fff5f5;
+    border-left: 4px solid #8b0000;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.history-bill-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.history-bill-card .bill-field {
+    font-size: 0.88rem;
+    min-width: 90px;
+}
+.history-bill-card .bill-field strong { color: #475569; }
+.history-bill-card .bill-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.history-bill-card .bill-actions button {
+    font-size: 0.82rem;
+    height: 32px;
+    padding: 4px 10px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.status-paid { background: #d4edda; color: #155724; }
+.status-partial { background: #fff3cd; color: #856404; }
+.status-pending { background: #f8d7da; color: #721c24; }
+
+.bill-status-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+.bill-status-check:hover {
+    border-color: #94a3b8;
+}
+.bill-status-check input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    accent-color: #155724;
+}
+.bill-status-check.is-paid {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+.bill-status-check.is-pending {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+.bill-status-check.is-partial {
+    background: #fff3cd;
+    border-color: #ffeeba;
+    color: #856404;
+}
+
+/* ---------- 12. Pending Payments Report ---------- */
+.pending-report-page {
+    padding: 28px 32px 25px 32px;
+}
+.report-header {
+    text-align: center;
+    margin-bottom: 18px;
+    width: 100%;
+}
+.report-jay {
+    font-size: 16px;
+    font-weight: 700;
+    color: #8b0000;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-variant: small-caps;
+    padding: 8px 0 6px 0;
+    text-align: center;
+    width: 100%;
+}
+.report-red-line {
+    height: 2.5px;
+    background: #8b0000;
+    margin: 0 0 10px 0;
+    width: 100%;
+}
+.report-business-name {
+    text-align: center;
+    font-size: 36px;
+    font-weight: 900;
+    color: #8b0000;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    line-height: 1.1;
+    padding-bottom: 6px;
+    margin: 0 auto;
+    width: 100%;
+    display: block;
+}
+.report-grey-line {
+    height: 1px;
+    background: #ccc;
+    margin-bottom: 14px;
+    width: 100%;
+}
+.report-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #8b0000;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 4px;
+    width: 100%;
+}
+.report-party-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #8b0000;
+    letter-spacing: 0.5px;
+    text-align: center;
+    margin: 5px auto 4px auto;
+    width: 100%;
+    display: block;
+}
+.report-date {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    margin-bottom: 18px;
+    width: 100%;
+}
+
+.pending-party-group {
+    margin-bottom: 22px;
+}
+.pending-party-header {
+    font-size: 14px;
+    font-weight: 800;
+    color: #8b0000;
+    letter-spacing: 0.5px;
+    padding: 7px 12px;
+    background: #fff5f5;
+    border-left: 4px solid #8b0000;
+    margin-bottom: 6px;
+}
+.pending-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+.pending-table th {
+    background: #8b0000;
+    color: #fff;
+    padding: 8px 10px;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid #700000;
+}
+.pending-table th:first-child { text-align: left; width: 40%; }
+.pending-table th:nth-child(2) { text-align: right; width: 35%; }
+.pending-table th:last-child { text-align: center; width: 25%; }
+
+.pending-table td {
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+}
+.pending-table td:first-child { text-align: left; font-weight: 600; }
+.pending-table td:nth-child(2) { text-align: right; font-weight: 700; color: #8b0000; }
+.pending-table td:last-child { text-align: center; }
+.pending-table tbody tr:nth-child(even) { background: #fafafa; }
+.pending-table .party-total-row td {
+    border-top: 2px solid #8b0000;
+    border-bottom: 2px solid #8b0000;
+    font-weight: 800;
+    background: #fff5f5;
+    color: #8b0000;
+    font-size: 13.5px;
+}
+.overall-pending-banner {
+    margin-top: 20px;
+    padding: 12px 18px;
+    background: #8b0000;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 2px;
+}
+.overall-pending-banner .overall-label {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.overall-pending-banner .overall-value {
+    font-size: 18px;
+    font-weight: 900;
+}
+
+/* ---------- 13. Dashboard ---------- */
+.dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.dash-card {
+    padding: 18px 12px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.dash-card .dash-value {
+    font-size: 1.45rem;
+    font-weight: 800;
+    display: block;
+    margin-bottom: 4px;
+}
+.dash-card .dash-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+}
+.dash-card:nth-child(1) { background: #fff5f5; }
+.dash-card:nth-child(1) .dash-value { color: #8b0000; }
+.dash-card:nth-child(2) { background: #f0f7ff; }
+.dash-card:nth-child(2) .dash-value { color: #0055aa; }
+.dash-card:nth-child(3) { background: #eafbe7; }
+.dash-card:nth-child(3) .dash-value { color: #166534; }
+.dash-card:nth-child(4) { background: #fff5f5; }
+.dash-card:nth-child(4) .dash-value { color: #c00; }
+.dash-card:nth-child(5) { background: #fff8e1; }
+.dash-card:nth-child(5) .dash-value { color: #b8860b; }
+.dash-card:nth-child(6) { background: #eafbe7; }
+.dash-card:nth-child(6) .dash-value { color: #166534; }
+
+.party-summary-list {
+    margin-top: 14px;
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+}
+.party-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+.party-summary-table th {
+    background: #8b0000;
+    color: #fff;
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+.party-summary-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+.party-summary-table tbody tr:nth-child(even) { background: #f8fafc; }
+.party-summary-table tbody tr:hover { background: #f1f5f9; }
+
+/* ================================================================
+   14. PRINT STYLES — Strict Pixel-Perfect A4 Portrait
+   ================================================================ */
+@media print {
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        min-width: 0 !important;
+    }
+
+    #appNav,
+    .no-print,
+    .app-controls,
+    .page:not(.active),
+    #page-history, 
+    #page-dashboard,
+    .form-actions, 
+    .payment-controls, 
+    .totals-edit,
+    .status-msg, 
+    .filter-btns, 
+    .search-input,
+    #historySearch, 
+    #pendingSearch {
+        display: none !important;
+    }
+
+    .page.active {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+        width: 100% !important;
+    }
+
+    .preview-scroll-container {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .bill-preview {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .bill-page {
+        border: 2.5px solid #8b0000 !important;
+        min-height: auto;
+        page-break-inside: avoid;
+        padding: 24px 28px !important;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+}
+
+</style>
+    <!-- html2canvas + jsPDF for pixel-perfect PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Firebase App & Firestore SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
 </head>
 <body>
 
-  <!-- Application Header (Compact Mobile-First) -->
-  <header class="app-header no-print navigation">
-    <div class="header-container">
-      <div class="brand-info">
-        <div class="brand-icon">✨</div>
-        <h1 class="brand-title">AKSHAR ARI WORK</h1>
-      </div>
-      <div class="header-cloud-status">
-        <button type="button" id="cloud-status-btn" class="cloud-status-badge status-checking" onclick="handleCloudStatusClick()" title="Cloud Connection & Account">
-          <span class="status-dot">●</span>
-          <span id="cloud-status-text">Cloud Connecting...</span>
-        </button>
-      </div>
+<!-- ===== NAVIGATION BAR ===== -->
+<nav id="appNav">
+    <div class="nav-header">
+        <span class="nav-brand">AKSHAR ARI WORK</span>
+        <div class="nav-sync-indicator" id="navSyncBadge" title="Firebase Cloud Sync Status">
+            <span class="sync-dot"></span>
+            <span class="sync-text" id="syncText">Checking Cloud...</span>
+        </div>
     </div>
-  </header>
-
-  <!-- Section Switcher Tabs (Separates Form & Preview) -->
-  <nav class="tab-navigation no-print navigation" aria-label="Bill Navigation">
-    <div class="tab-nav-container">
-      <button class="tab-btn active" id="tab-editor" type="button" onclick="switchTab('editor')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        1. ENTER BILL
-      </button>
-      <button class="tab-btn" id="tab-preview" type="button" onclick="switchTab('preview')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        2. BILL PREVIEW
-      </button>
-      <button class="tab-btn" id="tab-history" type="button" onclick="switchTab('history')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        3. BILL HISTORY <span class="tab-badge" id="history-badge">0</span>
-      </button>
+    <div class="nav-links">
+        <a href="#" class="nav-link active" data-page="bill">New Bill</a>
+        <a href="#" class="nav-link" data-page="history">Bill History</a>
+        <a href="#" class="nav-link" data-page="pending">Pending Payments</a>
+        <a href="#" class="nav-link" data-page="dashboard">Dashboard</a>
     </div>
-  </nav>
+</nav>
 
-  <!-- Main Application Container -->
-  <main class="app-container">
+<!-- ===== PAGE: NEW BILL ===== -->
+<div id="page-bill" class="page active">
 
-    <!-- ==========================================
-         SECTION 1: BILL ENTRY FORM
-         ========================================== -->
-    <section class="section-panel input-section controls navigation mobile-entry buttons" id="panel-editor">
-      
-      <!-- Active Edit Mode Alert Banner (Visible when editing an existing Firestore bill) -->
-      <div id="editing-mode-banner" class="edit-mode-alert no-print" style="display: none;">
-        <div class="edit-alert-content">
-          <span class="edit-alert-icon">✏️</span>
-          <div class="edit-alert-text">
-            <strong>Editing Saved Bill:</strong> <span id="editing-bill-label">Bill #001</span>
-            <div class="text-muted">Saving will update this bill in Firestore without creating duplicates.</div>
-          </div>
+    <!-- Editing Controls (hidden during print) -->
+    <div class="app-controls no-print">
+        <h2>Bill Entry</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="inp-billNo">Bill No:</label>
+                <input type="text" id="inp-billNo" required />
+            </div>
+            <div class="form-group">
+                <label for="inp-challan">Party Challan No:</label>
+                <input type="text" id="inp-challan" required />
+            </div>
+            <div class="form-group">
+                <label for="inp-date">Date:</label>
+                <input type="date" id="inp-date" required />
+            </div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline" onclick="cancelEditMode()">Cancel Edit</button>
-      </div>
-
-      <!-- Card 1: Bill Information (Bill No, Party Challan No, Date) -->
-      <div class="app-card">
-        <h2 class="card-heading">
-          <span class="step-badge">1</span> BILL INFORMATION
-        </h2>
-        <div class="form-grid-3">
-          <div class="form-group">
-            <label for="input-bill-no">Bill No.</label>
-            <input type="text" id="input-bill-no" class="form-input font-bold text-red" placeholder="Enter Bill No." autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label for="input-challan-no">Party Challan No. <span class="text-muted">(Optional)</span></label>
-            <input type="text" id="input-challan-no" class="form-input" placeholder="e.g. CH-101" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label for="input-bill-date">Date</label>
-            <input type="date" id="input-bill-date" class="form-input">
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 2: Party Details -->
-      <div class="app-card">
-        <h2 class="card-heading">
-          <span class="step-badge">2</span> PARTY DETAILS
-        </h2>
-        <div class="form-group">
-          <label for="input-party-name">Party Name</label>
-          <input type="text" id="input-party-name" class="form-input" placeholder="Enter Party Name" autocomplete="off">
-        </div>
-      </div>
-
-      <!-- Card 3: 10 Item Entry Cards / Rows -->
-      <div class="app-card items-card">
-        <div class="card-heading-flex">
-          <h2 class="card-heading">
-            <span class="step-badge">3</span> ITEM ENTRY (10 ITEMS)
-          </h2>
-          <span class="tip-pill">Amount = Qty × Rate</span>
+        <div class="form-row">
+            <div class="form-group col-span-2">
+                <label for="inp-partyName">Party Name:</label>
+                <input type="text" id="inp-partyName" required />
+            </div>
+            <div class="form-group col-span-2">
+                <label for="inp-partyDetails">Party Details (optional):</label>
+                <input type="text" id="inp-partyDetails" />
+            </div>
         </div>
 
-        <!-- Desktop Table Header (Visible on Desktop > 600px, Hidden on Mobile) -->
-        <div class="desktop-table-header" aria-hidden="true">
-          <div class="dth-cell dth-sr">#</div>
-          <div class="dth-cell dth-desc">Item / Work Description</div>
-          <div class="dth-cell dth-qty">Quantity</div>
-          <div class="dth-cell dth-rate">Rate (₹)</div>
-          <div class="dth-cell dth-amount">Amount (₹)</div>
+        <!-- Editable item table -->
+        <div class="table-scroll">
+        <table id="editTable">
+            <thead>
+                <tr>
+                    <th class="th-sr">SR. NO.</th>
+                    <th class="th-desc">ITEM / WORK DESCRIPTION</th>
+                    <th class="th-qty">QUANTITY</th>
+                    <th class="th-rate">RATE (₹)</th>
+                    <th class="th-amt">AMOUNT (₹)</th>
+                    <th class="th-del no-print">✕</th>
+                </tr>
+            </thead>
+            <tbody id="editTableBody">
+                <tr>
+                    <td class="td-sr-num">1</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 1">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">2</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 2">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">3</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 3">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">4</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 4">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">5</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 5">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">6</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 6">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">7</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 7">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">8</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 8">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">9</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 9">✕</button></td>
+                </tr>
+                <tr>
+                    <td class="td-sr-num">10</td>
+                    <td><input type="text" class="inp-item-desc" placeholder="Enter item or work description" /></td>
+                    <td><input type="number" inputmode="numeric" min="0" placeholder="0" class="inp-item-qty" /></td>
+                    <td><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="inp-item-rate" /></td>
+                    <td><input type="text" readonly placeholder="0.00" class="inp-item-amt" /></td>
+                    <td class="no-print td-del-cell"><button type="button" class="btn-del-row" title="Delete this row" aria-label="Delete row 10">✕</button></td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+        <div class="form-actions table-actions">
+            <button type="button" id="btn-addRow" class="btn btn-red">+ Add Item</button>
+            <button type="button" id="btn-deleteRow" class="btn btn-outline">− Delete Last Row</button>
         </div>
 
-        <!-- 10 Static Item Cards (Directly in HTML so inputs are NEVER missing) -->
-        <div class="items-list-container" id="items-list-container">
-          
-          <!-- ITEM 1 -->
-          <div class="item-card" data-index="1">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #1</span>
+        <!-- Totals -->
+        <div class="totals-edit">
+            <div class="total-line"><label>Subtotal (₹):</label> <input type="text" id="inp-subtotal" readonly /></div>
+            <div class="total-line">
+                <label for="inp-discount">Discount (%):</label>
+                <input type="number" id="inp-discount" min="0" max="100" value="0" step="any" placeholder="0" />
             </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-1" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-1" class="form-input item-desc" data-index="1" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-1" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-1" class="form-input item-qty" data-index="1" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-1" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-1" class="form-input item-rate" data-index="1" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-1">₹ 0.00</div>
-              </div>
+            <div class="total-line" id="line-discountAmt">
+                <label>Discount Amount (₹):</label>
+                <input type="text" id="inp-discountAmount" readonly value="0.00" />
             </div>
-          </div>
-
-          <!-- ITEM 2 -->
-          <div class="item-card" data-index="2">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #2</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-2" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-2" class="form-input item-desc" data-index="2" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-2" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-2" class="form-input item-qty" data-index="2" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-2" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-2" class="form-input item-rate" data-index="2" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-2">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 3 -->
-          <div class="item-card" data-index="3">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #3</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-3" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-3" class="form-input item-desc" data-index="3" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-3" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-3" class="form-input item-qty" data-index="3" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-3" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-3" class="form-input item-rate" data-index="3" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-3">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 4 -->
-          <div class="item-card" data-index="4">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #4</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-4" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-4" class="form-input item-desc" data-index="4" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-4" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-4" class="form-input item-qty" data-index="4" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-4" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-4" class="form-input item-rate" data-index="4" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-4">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 5 -->
-          <div class="item-card" data-index="5">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #5</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-5" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-5" class="form-input item-desc" data-index="5" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-5" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-5" class="form-input item-qty" data-index="5" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-5" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-5" class="form-input item-rate" data-index="4" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-5">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 6 -->
-          <div class="item-card" data-index="6">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #6</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-6" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-6" class="form-input item-desc" data-index="6" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-6" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-6" class="form-input item-qty" data-index="6" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-6" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-6" class="form-input item-rate" data-index="6" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-6">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 7 -->
-          <div class="item-card" data-index="7">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #7</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-7" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-7" class="form-input item-desc" data-index="7" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-7" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-7" class="form-input item-qty" data-index="7" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-7" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-7" class="form-input item-rate" data-index="7" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-7">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 8 -->
-          <div class="item-card" data-index="8">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #8</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-8" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-8" class="form-input item-desc" data-index="8" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-8" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-8" class="form-input item-qty" data-index="8" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-8" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-8" class="form-input item-rate" data-index="8" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-8">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 9 -->
-          <div class="item-card" data-index="9">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #9</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-9" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-9" class="form-input item-desc" data-index="9" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-9" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-9" class="form-input item-qty" data-index="9" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-9" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-9" class="form-input item-rate" data-index="9" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-9">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEM 10 -->
-          <div class="item-card" data-index="10">
-            <div class="item-card-header">
-              <span class="item-card-badge">ITEM #10</span>
-            </div>
-            <div class="item-card-body">
-              <div class="item-field field-desc">
-                <label for="item-desc-10" class="field-label">Item / Work Description</label>
-                <input type="text" id="item-desc-10" class="form-input item-desc" data-index="10" placeholder="Enter work description...">
-              </div>
-              <div class="item-fields-row">
-                <div class="item-field field-qty">
-                  <label for="item-qty-10" class="field-label">Quantity</label>
-                  <input type="number" id="item-qty-10" class="form-input item-qty" data-index="10" min="0" step="any" placeholder="0">
-                </div>
-                <div class="item-field field-rate">
-                  <label for="item-rate-10" class="field-label">Rate (₹)</label>
-                  <input type="number" id="item-rate-10" class="form-input item-rate" data-index="10" min="0" step="any" placeholder="0.00">
-                </div>
-              </div>
-              <div class="item-field field-amount">
-                <label class="field-label">Amount</label>
-                <div class="amount-val-display" id="item-amount-10">₹ 0.00</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Card 4: Calculation Summary -->
-      <div class="app-card summary-card">
-        <h2 class="card-heading">
-          <span class="step-badge">4</span> CALCULATION SUMMARY
-        </h2>
-        <div class="summary-list">
-          <div class="summary-item">
-            <span class="summary-title">Subtotal</span>
-            <span class="summary-value" id="calc-subtotal">₹ 0.00</span>
-          </div>
-          <div class="summary-item grand-total-item">
-            <span class="summary-title">GRAND TOTAL</span>
-            <span class="summary-value" id="calc-grandtotal">₹ 0.00</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card 5: Actions / Button Grid -->
-      <div class="app-card actions-card controls buttons no-print">
-        <!-- Secondary Utility Row (New / Clear) -->
-        <div class="utility-btn-row">
-          <button id="btn-new-bill" class="btn btn-outline" type="button" onclick="handleNewBill()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            + New Bill
-          </button>
-          <button id="btn-clear" class="btn btn-outline-danger" type="button" onclick="handleClear()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Clear
-          </button>
+            <div class="total-line grand"><label>Grand Total (₹):</label> <input type="text" id="inp-grandTotal" readonly /></div>
         </div>
 
-        <!-- Primary Action Buttons (Full Width, Min-Height: 46px, Large Touch Targets) -->
-        <div class="primary-btn-stack">
-          <button id="btn-generate" class="btn btn-primary btn-action-mobile" type="button" onclick="generateBill()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Generate Bill
-          </button>
-
-          <button id="btn-print" class="btn btn-secondary btn-action-mobile" type="button" onclick="printBill()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print Bill
-          </button>
-
-          <button id="btn-pdf" class="btn btn-accent btn-action-mobile" type="button" onclick="saveAsPDF()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Save as PDF
-          </button>
+        <!-- Payment -->
+        <div class="payment-controls">
+            <label class="chk-label"><input type="checkbox" id="chk-payment" /> Payment Received</label>
+            <div id="paymentFields" class="payment-fields hidden">
+                <div class="form-group"><label>Amount Received (₹):</label><input type="number" id="inp-amountReceived" min="0" value="0" /></div>
+                <div class="form-group"><label>Payment Date:</label><input type="date" id="inp-paymentDate" /></div>
+            </div>
         </div>
-      </div>
 
-    </section>
-
-    <!-- ==========================================
-         SECTION 2: A4 BILL PREVIEW
-         (Completely separated from Form)
-         ========================================== -->
-    <section class="section-panel" id="panel-preview" style="display: none;">
-      
-      <!-- Preview Navigation Toolbar (Screen Only) -->
-      <div class="preview-header-bar no-print controls buttons">
-        <button id="btn-back-to-edit" class="btn btn-outline btn-sm" type="button" onclick="switchTab('editor')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          ← Back to Edit Bill
-        </button>
-        <div class="preview-actions-right">
-          <button id="btn-preview-print" class="btn btn-secondary btn-sm" type="button" onclick="printBill()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print
-          </button>
-          <button id="btn-preview-pdf" class="btn btn-accent btn-sm" type="button" onclick="saveAsPDF()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Save PDF
-          </button>
+        <!-- Action Buttons -->
+        <div class="form-actions">
+            <button type="button" id="btn-save" class="btn btn-blue">💾 Save Bill</button>
+            <button type="button" id="btn-print" class="btn btn-green">🖨️ Print Bill</button>
+            <button type="button" id="btn-pdf" class="btn btn-green">📄 Download PDF</button>
+            <button type="button" id="btn-reset" class="btn btn-outline">↺ Reset</button>
         </div>
-      </div>
+        <div id="statusMsg" class="status-msg"></div>
+    </div>
 
-      <!-- Live A4 Bill Document (Print Target & PDF Source) -->
-      <div class="preview-container">
-        <div class="bill-preview preview-bill" id="bill-preview">
-          
-          <!-- Devotional Motto (॥ Jay Swaminarayan ॥) -->
-          <div class="bill-motto-wrapper">
-            <span class="motto-danda">॥</span>
-            <span class="motto-text">Jay Swaminarayan</span>
-            <span class="motto-danda">॥</span>
-          </div>
-
-          <!-- Bill Header -->
-          <div class="bill-header">
-            <div class="header-accent-bar"></div>
-            <div class="header-main-content">
-              <h1 class="bill-brand-name">AKSHAR ARI WORK</h1>
+    <!-- ===== BILL PREVIEW (this is what prints/PDFs) ===== -->
+    <h3 class="no-print preview-section-title">— Bill Preview —</h3>
+    <div class="preview-scroll-container">
+        <div id="billPreview" class="bill-preview">
+            <div class="bill-page">
+            <!-- Header -->
+            <div class="bill-header">
+                <div class="bill-jay">॥ Jay Swaminarayan ॥</div>
+                <div class="bill-red-line"></div>
+                <div class="bill-business-name">AKSHAR ARI WORK</div>
+                <div class="bill-grey-line"></div>
             </div>
 
-            <!-- Bill Meta Details (Manual Bill No, Party Challan No & Date) -->
-            <div class="bill-meta-strip">
-              <div class="meta-item">
-                <span class="meta-label">Bill No:</span>
-                <span class="meta-value font-mono text-red" id="view-bill-no">—</span>
-              </div>
-              <div class="meta-item is-hidden" id="view-challan-item" style="display: none !important;">
-                <span class="meta-label">Party Challan No:</span>
-                <span class="meta-value font-mono" id="view-challan-no"></span>
-              </div>
-              <div class="meta-item text-right">
-                <span class="meta-label">Date:</span>
-                <span class="meta-value" id="view-bill-date">--/--/----</span>
-              </div>
+            <!-- Bill Info Row -->
+            <div class="bill-info-row">
+                <div class="bill-info-cell"><span class="info-label">Bill No:</span> <span id="prev-billNo"></span></div>
+                <div class="bill-info-cell"><span class="info-label">Party Challan No:</span> <span id="prev-challan"></span></div>
+                <div class="bill-info-cell"><span class="info-label">Date:</span> <span id="prev-date">--/--/----</span></div>
             </div>
-          </div>
 
-          <!-- Party Details -->
-          <div class="bill-customer-section">
-            <div class="customer-info-box">
-              <div class="customer-info-header">PARTY DETAILS</div>
-              <div class="customer-info-body">
-                <div class="customer-row">
-                  <span class="customer-label">Party Name:</span>
-                  <span class="customer-value" id="view-party-name">—</span>
+            <!-- Party Details -->
+            <div class="bill-party-section">
+                <div class="party-heading">PARTY DETAILS</div>
+                <div class="party-name">Party Name: <span id="prev-partyName"></span></div>
+                <div class="party-details" id="prev-partyDetailsRow" style="display:none">
+                    <span id="prev-partyDetails"></span>
                 </div>
-              </div>
             </div>
-          </div>
 
-          <!-- 10-Row Item Table (Pre-rendered directly in HTML) -->
-          <div class="bill-table-container">
+            <!-- Items Table -->
             <table class="bill-table">
-              <thead>
-                <tr>
-                  <th class="col-sr">Sr. No.</th>
-                  <th class="col-desc">Item / Work Description</th>
-                  <th class="col-qty">Quantity</th>
-                  <th class="col-rate">Rate (₹)</th>
-                  <th class="col-amount">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody id="view-items-tbody">
-                <tr>
-                  <td class="col-sr">1</td>
-                  <td class="col-desc" id="view-desc-1"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-1">—</td>
-                  <td class="col-rate" id="view-rate-1">—</td>
-                  <td class="col-amount" id="view-amount-1">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">2</td>
-                  <td class="col-desc" id="view-desc-2"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-2">—</td>
-                  <td class="col-rate" id="view-rate-2">—</td>
-                  <td class="col-amount" id="view-amount-2">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">3</td>
-                  <td class="col-desc" id="view-desc-3"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-3">—</td>
-                  <td class="col-rate" id="view-rate-3">—</td>
-                  <td class="col-amount" id="view-amount-3">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">4</td>
-                  <td class="col-desc" id="view-desc-4"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-4">—</td>
-                  <td class="col-rate" id="view-rate-4">—</td>
-                  <td class="col-amount" id="view-amount-4">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">5</td>
-                  <td class="col-desc" id="view-desc-5"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-5">—</td>
-                  <td class="col-rate" id="view-rate-5">—</td>
-                  <td class="col-amount" id="view-amount-5">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">6</td>
-                  <td class="col-desc" id="view-desc-6"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-6">—</td>
-                  <td class="col-rate" id="view-rate-6">—</td>
-                  <td class="col-amount" id="view-amount-6">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">7</td>
-                  <td class="col-desc" id="view-desc-7"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-7">—</td>
-                  <td class="col-rate" id="view-rate-7">—</td>
-                  <td class="col-amount" id="view-amount-7">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">8</td>
-                  <td class="col-desc" id="view-desc-8"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-8">—</td>
-                  <td class="col-rate" id="view-rate-8">—</td>
-                  <td class="col-amount" id="view-amount-8">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">9</td>
-                  <td class="col-desc" id="view-desc-9"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-9">—</td>
-                  <td class="col-rate" id="view-rate-9">—</td>
-                  <td class="col-amount" id="view-amount-9">—</td>
-                </tr>
-                <tr>
-                  <td class="col-sr">10</td>
-                  <td class="col-desc" id="view-desc-10"><span class="item-empty-desc">—</span></td>
-                  <td class="col-qty" id="view-qty-10">—</td>
-                  <td class="col-rate" id="view-rate-10">—</td>
-                  <td class="col-amount" id="view-amount-10">—</td>
-                </tr>
-              </tbody>
+                <thead>
+                    <tr>
+                        <th class="col-sr">SR.<br>NO.</th>
+                        <th class="col-desc">ITEM / WORK DESCRIPTION</th>
+                        <th class="col-qty">QUANTITY</th>
+                        <th class="col-rate">RATE (₹)</th>
+                        <th class="col-amt">AMOUNT (₹)</th>
+                    </tr>
+                </thead>
+                <tbody id="prevTableBody">
+                    <!-- filled by JS -->
+                </tbody>
             </table>
-          </div>
 
-          <!-- Totals & Thank You Footer -->
-          <div class="bill-footer-section">
-            <div class="footer-left">
-              <div class="bill-thankyou-block">
-                <p class="bill-thankyou-text">Thank You!</p>
-                <p class="bill-thankyou-sub">We appreciate your valued business</p>
-              </div>
-            </div>
-            <div class="footer-right">
-              <div class="summary-table">
-                <div class="summary-row">
-                  <span class="lbl">Subtotal:</span>
-                  <span class="val font-mono" id="view-subtotal">₹ 0.00</span>
+            <!-- Bottom Section: Thank You + Totals -->
+            <div class="bill-bottom">
+                <div class="bill-thankyou">
+                    <div class="thankyou-title">Thank You!</div>
+                    <div class="thankyou-msg">We appreciate your valued business</div>
                 </div>
-                <div class="summary-row grand-total-row">
-                  <span class="lbl">GRAND TOTAL:</span>
-                  <span class="val font-mono" id="view-grandtotal">₹ 0.00</span>
+                <div class="bill-totals">
+                    <div class="totals-row subtotal-row">
+                        <span class="totals-label">Subtotal:</span>
+                        <span class="totals-value" id="prev-subtotal">₹0.00</span>
+                    </div>
+                    <div class="totals-row discount-row" id="prev-discountRow" style="display:none">
+                        <span class="totals-label" id="prev-discountLabel">Discount:</span>
+                        <span class="totals-value" id="prev-discount">₹0.00</span>
+                    </div>
+                    <div class="totals-row grandtotal-row">
+                        <span class="totals-label">GRAND TOTAL:</span>
+                        <span class="totals-value" id="prev-grandTotal">₹0.00</span>
+                    </div>
                 </div>
-              </div>
             </div>
-          </div>
+        </div><!-- /bill-page -->
+    </div><!-- /billPreview -->
+    </div><!-- /preview-scroll-container -->
+</div><!-- /page-bill -->
 
+
+<!-- ===== PAGE: BILL HISTORY ===== -->
+<div id="page-history" class="page">
+    <div class="app-controls">
+        <div class="history-page-header">
+            <h2>Cloud Bill History</h2>
+            <button type="button" id="btn-refreshCloudHistory" class="btn btn-sm btn-outline" title="Refresh history from Firestore cloud">🔄 Refresh Cloud</button>
         </div>
-      </div>
-
-    </section>
-
-    <!-- ==========================================
-         SECTION 3: BILL HISTORY
-         ========================================== -->
-    <section class="section-panel no-print" id="panel-history" style="display: none;">
-      
-      <div class="history-header-bar">
-        <div class="history-title-group">
-          <h2 class="history-main-heading">SAVED BILL HISTORY</h2>
-          <span class="history-cloud-tag" id="history-cloud-indicator">☁️ Firestore Cloud</span>
+        <input type="text" id="historySearch" class="search-input" placeholder="Search by Party Name, Bill No, or Challan No..." />
+        <div class="filter-btns">
+            <button class="btn btn-sm active" data-filter="all">All</button>
+            <button class="btn btn-sm" data-filter="paid">Paid</button>
+            <button class="btn btn-sm" data-filter="partial">Partially Paid</button>
+            <button class="btn btn-sm" data-filter="pending">Pending</button>
         </div>
-        <div class="history-header-actions">
-          <button class="btn btn-outline btn-sm" id="btn-refresh-history" type="button" onclick="refreshHistoryFromCloud()" title="Sync with Firestore Cloud">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            Sync
-          </button>
-          <button class="btn btn-danger-outline btn-sm" id="btn-clear-history" type="button" onclick="handleClearAllHistory()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            Clear
-          </button>
+        <div id="historyList" class="history-list">
+            <!-- filled by JS -->
         </div>
-      </div>
+    </div>
+</div>
 
-      <!-- LocalStorage to Firestore Cloud Migration Banner -->
-      <div id="migration-banner" class="migration-banner app-card" style="display: none;">
-        <div class="migration-banner-flex">
-          <div class="migration-icon">📦</div>
-          <div class="migration-info">
-            <strong class="migration-title">Local Device History Found</strong>
-            <p class="migration-desc"><span id="local-bills-count">0</span> bills saved in this browser. Migrate them to your shared Firestore cloud database so they appear across Computer, Phone, and APK.</p>
-          </div>
-          <button type="button" class="btn btn-primary btn-sm" onclick="promptMigrateLocalHistory()">
-            ☁️ Migrate Local History to Cloud
-          </button>
-        </div>
-      </div>
-
-      <!-- Auth Required Placeholder in History (Visible when logged out) -->
-      <div id="history-auth-required" class="app-card history-auth-card" style="display: none;">
-        <div class="empty-icon">🔒</div>
-        <h3 class="empty-title">Cloud Login Required</h3>
-        <p class="empty-desc">Sign in with your business account to access and sync your bills across Computer, Mobile, and Android APK.</p>
-        <button type="button" class="btn btn-primary" onclick="openAuthModal()">
-          ☁️ Log In with Firebase
-        </button>
-      </div>
-
-      <!-- Search & Filter Card -->
-      <div class="app-card history-search-card" id="history-search-card">
-        <div class="search-input-wrapper">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="history-search-input" class="form-input search-input" placeholder="Search Party Name / Bill No. / Party Challan No." autocomplete="off">
-          <button class="search-clear-btn" id="btn-clear-search" type="button" onclick="clearHistorySearch()" style="display: none;">✕</button>
-        </div>
-        <div class="history-stats-bar">
-          <div class="history-stats-left">
-            <span id="history-count-text">0 saved bills</span>
-          </div>
-          <div class="history-toggle-tools">
-            <button type="button" class="btn-toggle-tool" onclick="expandAllPartyGroups()">Expand All</button>
-            <button type="button" class="btn-toggle-tool" onclick="collapseAllPartyGroups()">Collapse All</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- History Cards Container -->
-      <div class="history-cards-container" id="history-cards-container">
-        <!-- Injected via JavaScript -->
-      </div>
-
-    </section>
-
-  </main>
-
-  <!-- Toast Notification -->
-  <div id="toast" class="toast no-print" role="alert" aria-live="polite"></div>
-
-  <!-- ==========================================
-       MODAL 1: FIREBASE AUTHENTICATION (LOGIN / REGISTER)
-       ========================================== -->
-  <div id="auth-modal" class="modal-overlay no-print" style="display: none;">
-    <div class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
-      <div class="modal-header">
-        <h3 id="auth-modal-title" class="modal-title">
-          <span>☁️</span> <span id="auth-modal-title-text">Cloud Login</span>
-        </h3>
-        <button type="button" class="modal-close-btn" onclick="closeAuthModal()" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <p class="auth-desc" id="auth-modal-desc">
-          Sign in to your business account to access and sync your bills across Computer, Mobile, and Android APK.
-        </p>
-
-        <!-- Firebase Configuration Missing Warning -->
-        <div id="auth-config-warning" class="alert-box alert-warning" style="display: none;">
-          <strong>Firebase Not Configured:</strong>
-          <div>Please open <code>firebase-config.js</code> and replace the placeholder keys with your Firebase project credentials.</div>
-        </div>
-
-        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-          <div class="form-group">
-            <label for="auth-email">Email Address</label>
-            <input type="email" id="auth-email" class="form-input" placeholder="e.g. owner@aksharariwork.com" required autocomplete="email">
-          </div>
-          <div class="form-group">
-            <label for="auth-password">Password</label>
-            <div class="password-input-wrapper">
-              <input type="password" id="auth-password" class="form-input" placeholder="Enter password (min 6 characters)" required autocomplete="current-password" minlength="6">
-              <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility" title="Show/Hide">👁</button>
+<!-- ===== PAGE: PENDING PAYMENTS ===== -->
+<div id="page-pending" class="page">
+    <div class="app-controls no-print">
+        <h2>Party Pending Payment Report</h2>
+        <div class="form-row pending-filter-row">
+            <div class="form-group party-select-group">
+                <label for="selectParty">SELECT PARTY NAME:</label>
+                <select id="selectParty">
+                    <option value="">-- SELECT PARTY NAME --</option>
+                </select>
             </div>
-          </div>
-
-          <div id="auth-error-msg" class="auth-error-msg" style="display: none;"></div>
-
-          <div class="auth-actions-stack">
-            <button type="submit" id="btn-auth-submit" class="btn btn-primary btn-action-mobile">
-              <span id="btn-auth-submit-text">Log In</span>
-            </button>
-          </div>
-        </form>
-
-        <div class="auth-footer-toggle">
-          <span id="auth-toggle-prompt">Don't have an account yet?</span>
-          <button type="button" class="btn-link" id="btn-auth-mode-toggle" onclick="toggleAuthMode()">
-            Create Business Account
-          </button>
+            <div class="form-group challan-search-group">
+                <label for="pendingSearch">Search Challan No:</label>
+                <input type="text" id="pendingSearch" class="search-input" placeholder="Filter challan no..." />
+            </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==========================================
-       MODAL 2: USER ACCOUNT DETAILS & LOGOUT
-       ========================================== -->
-  <div id="account-modal" class="modal-overlay no-print" style="display: none;">
-    <div class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
-      <div class="modal-header">
-        <h3 id="account-modal-title" class="modal-title">
-          <span>👤</span> Business Account
-        </h3>
-        <button type="button" class="modal-close-btn" onclick="closeAccountModal()" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="account-info-box">
-          <div class="account-info-row">
-            <span class="account-info-lbl">Logged in as:</span>
-            <span class="account-info-val" id="account-user-email">—</span>
-          </div>
-          <div class="account-info-row">
-            <span class="account-info-lbl">Cloud Status:</span>
-            <span class="account-info-val text-green" id="account-cloud-status">● Cloud Connected</span>
-          </div>
-          <div class="account-info-row">
-            <span class="account-info-lbl">Synced Bills:</span>
-            <span class="account-info-val" id="account-bills-count">0</span>
-          </div>
+        <div class="form-actions">
+            <button type="button" id="btn-generatePartyReport" class="btn btn-blue">🔍 Generate Party Pending Report</button>
+            <button type="button" id="btn-savePartyReport" class="btn btn-blue">💾 Save Party Pending Report</button>
+            <button type="button" id="btn-partyPdf" class="btn btn-green">📄 Download Party Pending PDF</button>
+            <button type="button" id="btn-partyPrint" class="btn btn-green">🖨️ Print Party Pending Report</button>
         </div>
+        <div id="pendingStatusMsg" class="status-msg"></div>
+    </div>
 
-        <p class="text-muted" style="font-size: 12px; margin-bottom: 16px;">
-          All your saved bills are stored securely in your private Firebase Firestore cloud and accessible across all your logged-in devices.
-        </p>
+    <!-- Live Preview & Printable Report Container -->
+    <div class="preview-scroll-container">
+        <div id="pendingReportPreview" class="bill-preview">
+            <div class="bill-page pending-report-page">
+                <!-- Centered Header -->
+                <div class="report-header">
+                    <div class="report-jay">॥ Jay Swaminarayan ॥</div>
+                    <div class="report-red-line"></div>
+                    <div class="report-business-name">AKSHAR ARI WORK</div>
+                    <div class="report-grey-line"></div>
+                    <div class="report-title">PENDING PAYMENT REPORT</div>
+                    <div class="report-party-name" id="pendingReportPartyName">Party Name: [Please Select a Party]</div>
+                    <div class="report-date" id="pendingReportDate">Generated on: --/--/----</div>
+                </div>
 
-        <div class="auth-actions-stack">
-          <button type="button" class="btn btn-danger-outline btn-action-mobile" onclick="handleLogout()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-            Log Out
-          </button>
+                <!-- Party-Wise Report Content -->
+                <div id="pendingReportContent">
+                    <!-- filled by JS -->
+                </div>
+
+                <!-- Overall / Party Total Banner -->
+                <div class="overall-pending-banner" id="overallPendingBanner" style="display:none;">
+                    <span class="overall-label" id="pendingBannerLabel">PARTY TOTAL PENDING:</span>
+                    <span class="overall-value" id="overallPendingAmount">₹0.00</span>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
+</div>
 
-  <!-- ==========================================
-       MODAL 3: DELETE CONFIRMATION MODAL
-       ========================================== -->
-  <div id="delete-modal" class="modal-overlay no-print" style="display: none;">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
-      <div class="modal-header">
-        <h3 id="delete-modal-title" class="modal-title" style="color: var(--primary-red);">
-          <span>🗑️</span> Delete Bill
-        </h3>
-        <button type="button" class="modal-close-btn" onclick="closeDeleteModal()" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <p style="font-size: 14px; color: var(--dark-text); margin: 0 0 10px 0;">
-          Are you sure you want to delete this bill?
-        </p>
-        <p class="text-muted" id="delete-bill-info" style="font-size: 12.5px; margin: 0;">
-          Bill No: 001
-        </p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline btn-sm" onclick="closeDeleteModal()">Cancel</button>
-        <button type="button" id="btn-confirm-delete" class="btn btn-danger btn-sm" onclick="confirmDeleteBill()">Delete</button>
-      </div>
+<!-- ===== PAGE: DASHBOARD ===== -->
+<div id="page-dashboard" class="page">
+    <div class="app-controls">
+        <h2>Dashboard</h2>
+        <div class="dashboard-cards" id="dashboardCards">
+            <!-- filled by JS -->
+        </div>
+        <h3>Party-wise Summary</h3>
+        <div id="partySummary" class="party-summary-list">
+            <!-- filled by JS -->
+        </div>
     </div>
-  </div>
+</div>
 
-  <!-- ==========================================
-       MODAL 4: LOCALSTORAGE MIGRATION MODAL
-       ========================================== -->
-  <div id="migrate-modal" class="modal-overlay no-print" style="display: none;">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="migrate-modal-title">
-      <div class="modal-header">
-        <h3 id="migrate-modal-title" class="modal-title">
-          <span>📦</span> Migrate Local History
-        </h3>
-        <button type="button" class="modal-close-btn" onclick="closeMigrateModal()" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <p style="font-size: 14px; color: var(--dark-text); margin-bottom: 10px;">
-          Found <strong id="modal-local-bills-count">0</strong> local bills stored in this browser.
-        </p>
-        <p style="font-size: 12.5px; color: var(--mid-text); margin-bottom: 12px; line-height: 1.45;">
-          Would you like to upload these bills to your Firebase Firestore cloud database? Duplicate bills with the same Bill No. will not be duplicated.
-        </p>
-        <div id="migrate-status-box" style="display: none; padding: 10px; border-radius: 6px; font-size: 12.5px; margin-bottom: 10px;"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline btn-sm" onclick="closeMigrateModal()">Cancel</button>
-        <button type="button" id="btn-confirm-migrate" class="btn btn-primary btn-sm" onclick="executeLocalMigration()">Migrate to Cloud</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Client-Side PDF Generation Libraries (CDN for Direct PDF Download on Android Chrome & GitHub Pages) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
-  <!-- Official Firebase Web SDK (Compat version for zero-bundler browser & Capacitor APK compatibility) -->
-  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-
-  <!-- Firebase Configuration File -->
-  <script src="firebase-config.js"></script>
-
-  <!-- Application JavaScript -->
-  <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
